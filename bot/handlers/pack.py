@@ -1,5 +1,4 @@
 import random
-import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -53,10 +52,8 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     if query:
         await query.answer()
         user_id = query.from_user.id
-        chat_id = query.message.chat_id
     else:
         user_id = update.effective_user.id
-        chat_id = update.effective_chat.id
 
     user = get_user(user_id)
 
@@ -114,34 +111,21 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     ]
 
     if query:
-        # Удаляем исходное сообщение с кнопками (чтобы не было дублей)
+        # Удаляем исходное сообщение с кнопками (чтобы не оставалось старых кнопок)
         try:
             await query.message.delete()
-        except:
-            pass
-        # Отправляем анимацию отдельным сообщением
-        anim_msg = await context.bot.send_animation(
-            chat_id=chat_id,
-            animation="https://media.tenor.com/2Lb0vKkL0bQAAAAi/sparkles.gif",  # можно заменить на свой GIF или убрать
-            caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
-            parse_mode="Markdown"
-        )
-        await asyncio.sleep(1.5)
-        # Удаляем анимацию (опционально)
-        try:
-            await anim_msg.delete()
-        except:
-            pass
-        # Отправляем карточку
+        except Exception as e:
+            print(f"Не удалось удалить сообщение: {e}")
+        # Отправляем карточку новым сообщением
         await context.bot.send_photo(
-            chat_id=chat_id,
+            chat_id=query.message.chat_id,
             photo=image_bytes,
             caption=caption,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        # Если команда не из кнопки — просто карточка
+        # Если команда не из кнопки (например, /free_pack) — просто карточка
         await update.message.reply_photo(
             photo=image_bytes,
             caption=caption,
