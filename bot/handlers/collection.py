@@ -1,4 +1,4 @@
- from telegram import Update
+from telegram import Update
 from telegram.ext import ContextTypes
 from ..database import get_collection
 
