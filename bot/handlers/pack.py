@@ -5,7 +5,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMe
 from telegram.ext import ContextTypes
 from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection
 from ..models.hero import HEROES
-from ..utils.image_generator import create_hero_card
 
 RARITY_EMOJIS = {
     "обычный": "📘",
