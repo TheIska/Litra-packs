@@ -11,7 +11,6 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
-    # Таблица пользователей с монетами
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -57,7 +56,55 @@ def get_user(user_id: int) -> Dict[str, Any]:
     conn.close()
     return result
 
-def add_coins(user_id: int, amount: int):
+def get_collection(user_id: int) -> Dict[str, Dict]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT hero_key, hero_data FROM collection WHERE user_id = ?", (user_id,))
+    rows = c.fetchall()
+    result = {}
+    for key, data in rows:
+        result[key] = json.loads(data)
+    conn.close()
+    return result
+
+def add_hero_to_collection(user_id: int, hero: Dict) -> None:
+    """Добавляет героя в коллекцию пользователя"""
+    hero_key = f"{hero['author']} – {hero['name']}"
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "INSERT OR REPLACE INTO collection (user_id, hero_key, hero_data) VALUES (?, ?, ?)",
+        (user_id, hero_key, json.dumps(hero, ensure_ascii=False))
+    )
+    conn.commit()
+    conn.close()
+
+def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET last_free_pack = ? WHERE user_id = ?", (timestamp.isoformat(), user_id))
+    conn.commit()
+    conn.close()
+
+def update_duel_stats(user_id: int, win: bool) -> None:
+    conn = get_connection()
+    c = conn.cursor()
+    if win:
+        c.execute("UPDATE users SET wins = wins + 1, rating = rating + 10 WHERE user_id = ?", (user_id,))
+    else:
+        c.execute("UPDATE users SET losses = losses + 1, rating = rating - 5 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_opponent(user_id: int) -> Optional[int]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users WHERE user_id != ? ORDER BY RANDOM() LIMIT 1", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def add_coins(user_id: int, amount: int) -> None:
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE users SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
@@ -76,5 +123,3 @@ def spend_coins(user_id: int, amount: int) -> bool:
         return True
     conn.close()
     return False
-
-# остальные функции (get_collection, add_hero_to_collection, update_last_free_pack, update_duel_stats, get_opponent) остаются без изменений
