@@ -1,7 +1,7 @@
 import random
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaAnimation
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
 from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
 from ..models.hero import HEROES
@@ -37,7 +37,6 @@ PACK_PRICES = {
 
 FREE_PACK_INTERVAL = timedelta(hours=3)
 
-# Анимированный GIF (можно заменить на свой)
 GIF_URL = "https://media.tenor.com/2Lb0vKkL0bQAAAAi/sparkles.gif"
 
 def get_hero_by_rarity_weights(weights):
@@ -56,8 +55,12 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     if query:
         await query.answer()
         user_id = query.from_user.id
+        chat_id = query.message.chat_id
+        message_id = query.message.message_id
     else:
         user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        message_id = None
 
     user = get_user(user_id)
 
@@ -70,14 +73,13 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
                 remaining = FREE_PACK_INTERVAL - (datetime.now() - last_time)
                 hours = int(remaining.total_seconds() // 3600)
                 minutes = int((remaining.total_seconds() % 3600) // 60)
-                msg = f"⏳ *Дар читателя* уже был открыт!\nСледующий через *{hours}ч {minutes}мин*."
+                msg = f"⏳ *{PACK_NAMES['free']}* уже был открыт!\nСледующий через *{hours}ч {minutes}мин*."
                 if query:
                     await query.edit_message_text(msg, parse_mode="Markdown")
                 else:
                     await update.message.reply_text(msg, parse_mode="Markdown")
                 return
     else:
-        # Проверка монет
         price = PACK_PRICES[pack_type]
         if not spend_coins(user_id, price):
             msg = f"❌ Недостаточно монет! Нужно *{price}*.\nТвой баланс: *{user['coins']}*"
@@ -97,26 +99,24 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     collection = get_collection(user_id)
     total = len(collection)
 
-    # ========== АНИМАЦИЯ ==========
-    # Отправляем GIF с анимацией
+    # Анимация (отдельным сообщением)
     if query:
-        await query.edit_message_media(
-            media=InputMediaAnimation(
-                media=GIF_URL,
-                caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
-                parse_mode="Markdown"
-            )
+        anim_msg = await context.bot.send_animation(
+            chat_id=chat_id,
+            animation=GIF_URL,
+            caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
+            parse_mode="Markdown"
         )
-        await asyncio.sleep(1.5)  # Пауза для анимации
+        await asyncio.sleep(1.5)
     else:
-        await update.message.reply_animation(
+        anim_msg = await update.message.reply_animation(
             animation=GIF_URL,
             caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
             parse_mode="Markdown"
         )
         await asyncio.sleep(1.5)
 
-    # ========== КАРТОЧКА ==========
+    # Карточка
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
@@ -135,14 +135,18 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     ]
 
     if query:
-        await query.edit_message_media(
-            media=InputMediaPhoto(
-                media=image_bytes,
-                caption=caption,
-                parse_mode="Markdown"
-            ),
+        await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=image_bytes,
+            caption=caption,
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        # Удаляем исходное сообщение с кнопками
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except:
+            pass
     else:
         await update.message.reply_photo(
             photo=image_bytes,
@@ -151,7 +155,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-# Обработчики для разных паков
+# Обработчики
 async def free_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await open_pack(update, context, "free")
 
