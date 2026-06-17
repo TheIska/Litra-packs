@@ -8,9 +8,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("📖 Дар читателя (бесплатно)", callback_data="free_pack")],
-        [InlineKeyboardButton("📚 Карманный фолиант (200 монет)", callback_data="small_pack")],
-        [InlineKeyboardButton("🔮 Тайная библиотека (500 монет)", callback_data="medium_pack")],
-        [InlineKeyboardButton("✨ Редчайший манускрипт (1000 монет)", callback_data="large_pack")],
+        [InlineKeyboardButton("📚 Маленький пак (200 монет)", callback_data="small_pack")],
+        [InlineKeyboardButton("🔮 Лишний пак (500 монет)", callback_data="medium_pack")],
+        [InlineKeyboardButton("✨ Новый пак (1000 монет)", callback_data="large_pack")],
         [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
         [InlineKeyboardButton("💰 Мои монеты", callback_data="coins")],
     ]
@@ -25,8 +25,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (без изменений)
-    pass
+    """Справка по боту"""
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        send_message = query.edit_message_text
+    else:
+        send_message = update.message.reply_text
+
+    help_text = (
+        "❓ *Как играть*\n\n"
+        "1. Каждые 3 часа ты можешь открыть *бесплатный пак* (Дар читателя).\n"
+        "2. За монеты можно купить улучшенные паки с большими шансами.\n"
+        "3. Монеты зарабатываются в дуэлях (победа +10, поражение -5).\n"
+        "4. Собирай коллекцию героев русской классики.\n"
+        "5. Участвуй в дуэлях с друзьями и повышай рейтинг!\n\n"
+        "📌 Бот создан для подготовки к ЕГЭ по литературе."
+    )
+    keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+    await send_message(help_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -37,11 +54,10 @@ async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 *Твой баланс:* {user['coins']} монет.\n\n"
         "Зарабатывай монеты, участвуя в дуэлях (победа +10, поражение -5) и открывая паки!",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="main_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
     )
 
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Магазин паков"""
     query = update.callback_query
     await query.answer()
     keyboard = [

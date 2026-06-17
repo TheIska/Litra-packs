@@ -1,5 +1,4 @@
 import random
-import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
@@ -97,23 +96,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     collection = get_collection(user_id)
     total = len(collection)
 
-    # ========== АНИМАЦИЯ (текстовая) ==========
-    if query:
-        # Редактируем исходное сообщение, показывая "открываем"
-        await query.edit_message_text(
-            f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
-            parse_mode="Markdown"
-        )
-        await asyncio.sleep(1.5)
-    else:
-        # Отправляем новое сообщение
-        msg = await update.message.reply_text(
-            f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
-            parse_mode="Markdown"
-        )
-        await asyncio.sleep(1.5)
-
-    # ========== КАРТОЧКА ==========
+    # Генерируем карточку
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
@@ -132,7 +115,6 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     ]
 
     if query:
-        # Редактируем то же сообщение, заменяя текст на картинку
         await query.edit_message_media(
             media=InputMediaPhoto(
                 media=image_bytes,
