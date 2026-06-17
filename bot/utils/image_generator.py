@@ -2,7 +2,6 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-# Путь к портретам
 PORTRAITS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'portraits')
 
 def load_portrait(filename):
@@ -18,91 +17,170 @@ def create_hero_card(hero):
     width, height = 600, 800
     rarity = hero.get("rarity", "обычный")
 
-    # Базовый фон
-    if rarity == "легендарный":
-        img = Image.new('RGB', (width, height), color=(40, 30, 20))
-    else:
-        img = Image.new('RGB', (width, height), color=(20, 20, 40))
+    # Цвета для разных редкостей
+    colors = {
+        "легендарный": {
+            "bg_start": (60, 40, 20),
+            "bg_end": (30, 20, 10),
+            "border": (255, 215, 0),
+            "accent": (255, 215, 0),
+            "text": (255, 255, 255),
+            "rarity_color": (255, 215, 0)
+        },
+        "эпический": {
+            "bg_start": (40, 10, 60),
+            "bg_end": (20, 5, 30),
+            "border": (155, 89, 182),
+            "accent": (155, 89, 182),
+            "text": (255, 255, 255),
+            "rarity_color": (155, 89, 182)
+        },
+        "редкий": {
+            "bg_start": (10, 30, 60),
+            "bg_end": (5, 15, 40),
+            "border": (52, 152, 219),
+            "accent": (52, 152, 219),
+            "text": (255, 255, 255),
+            "rarity_color": (52, 152, 219)
+        },
+        "обычный": {
+            "bg_start": (40, 40, 40),
+            "bg_end": (20, 20, 20),
+            "border": (149, 165, 166),
+            "accent": (149, 165, 166),
+            "text": (220, 220, 220),
+            "rarity_color": (149, 165, 166)
+        }
+    }
+
+    pal = colors.get(rarity, colors["обычный"])
+
+    # Градиентный фон
+    img = Image.new('RGB', (width, height))
+    for y in range(height):
+        ratio = y / height
+        r = int(pal["bg_start"][0] * (1 - ratio) + pal["bg_end"][0] * ratio)
+        g = int(pal["bg_start"][1] * (1 - ratio) + pal["bg_end"][1] * ratio)
+        b = int(pal["bg_start"][2] * (1 - ratio) + pal["bg_end"][2] * ratio)
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
 
     draw = ImageDraw.Draw(img)
 
-    # Цвет рамки
-    rarity_colors = {
-        "легендарный": (255, 215, 0),
-        "эпический": (255, 215, 0),
-        "редкий": (52, 152, 219),
-        "обычный": (149, 165, 166)
-    }
-    border_color = rarity_colors.get(rarity, (100, 100, 100))
-
-    # Рамка
-    border_width = 8
+    # Рамка с двойной линией
+    border_width = 10
+    # Внешняя рамка
     draw.rectangle(
         [(border_width, border_width), (width - border_width, height - border_width)],
-        outline=border_color,
-        width=border_width
+        outline=pal["border"],
+        width=4
+    )
+    # Внутренняя рамка
+    inner_offset = border_width + 8
+    draw.rectangle(
+        [(inner_offset, inner_offset), (width - inner_offset, height - inner_offset)],
+        outline=pal["border"],
+        width=2
     )
 
-    # Портрет (только для легендарных)
+    # Заголовок "Литературный Герой" сверху
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 28)
+    except:
+        font_title = ImageFont.load_default()
+    draw.text((width//2, 20), "📖 ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
+
+    # Портрет для легендарных
     portrait = None
     if rarity == "легендарный" and "portrait" in hero:
         portrait = load_portrait(hero["portrait"])
 
     if portrait:
-        # Масштабируем до 200x200
-        portrait = portrait.resize((200, 200), Image.Resampling.LANCZOS)
+        # Масштабируем до 220x220
+        portrait = portrait.resize((220, 220), Image.Resampling.LANCZOS)
         # Круглая маска
-        mask = Image.new('L', (200, 200), 0)
+        mask = Image.new('L', (220, 220), 0)
         mask_draw = ImageDraw.Draw(mask)
-        mask_draw.ellipse((0, 0, 200, 200), fill=255)
+        mask_draw.ellipse((0, 0, 220, 220), fill=255)
         portrait.putalpha(mask)
         # Центрируем
-        x = (width - 200) // 2
-        y = 120
+        x = (width - 220) // 2
+        y = 80
         img.paste(portrait, (x, y), portrait)
-        # Рамка вокруг портрета
-        draw.ellipse((x-5, y-5, x+205, y+205), outline=(255, 215, 0), width=4)
+        # Золотая рамка вокруг портрета
+        draw.ellipse((x-8, y-8, x+228, y+228), outline=pal["border"], width=6)
     else:
-        # Если портрета нет — показываем иконку
-        draw.text((width//2, 200), "📜", fill=(200, 200, 200), font=ImageFont.load_default(), anchor="mt")
-
-    # Шрифты (без загрузки внешних — используем стандартный)
-    font_large = ImageFont.load_default()
-    font_medium = ImageFont.load_default()
-    font_small = ImageFont.load_default()
+        # Если портрета нет — показываем большую иконку
+        try:
+            font_icon = ImageFont.truetype("arial.ttf", 100)
+        except:
+            font_icon = ImageFont.load_default()
+        draw.text((width//2, 140), "📜", fill=pal["border"], font=font_icon, anchor="mt")
 
     # Имя героя
-    y_offset = 420 if portrait else 80
-    draw.text((width//2, y_offset), hero["name"], fill=(255, 255, 255), font=font_large, anchor="mt")
+    try:
+        font_name = ImageFont.truetype("arial.ttf", 44)
+    except:
+        font_name = ImageFont.load_default()
+    y_offset = 380 if portrait else 280
+    # Обводка имени (тень)
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        draw.text((width//2 + dx, y_offset + dy), hero["name"], fill=(0,0,0), font=font_name, anchor="mt")
+    draw.text((width//2, y_offset), hero["name"], fill=pal["text"], font=font_name, anchor="mt")
 
     # Разделитель
-    y_offset += 50
-    draw.line([(80, y_offset), (width - 80, y_offset)], fill=(100, 100, 100), width=2)
+    y_offset += 55
+    draw.line([(80, y_offset), (width - 80, y_offset)], fill=pal["accent"], width=2)
     y_offset += 30
 
     # Книга
-    draw.text((width//2, y_offset), f"📖 {hero['book']}", fill=(200, 200, 200), font=font_medium, anchor="mt")
-    y_offset += 45
+    try:
+        font_book = ImageFont.truetype("arial.ttf", 26)
+    except:
+        font_book = ImageFont.load_default()
+    draw.text((width//2, y_offset), f"📖 {hero['book']}", fill=(200, 200, 200), font=font_book, anchor="mt")
+    y_offset += 40
 
     # Автор
-    draw.text((width//2, y_offset), f"✍️ {hero['author']}", fill=(150, 150, 150), font=font_small, anchor="mt")
-    y_offset += 60
+    try:
+        font_author = ImageFont.truetype("arial.ttf", 22)
+    except:
+        font_author = ImageFont.load_default()
+    draw.text((width//2, y_offset), f"✍️ {hero['author']}", fill=(180, 180, 180), font=font_author, anchor="mt")
+    y_offset += 55
 
-    # Редкость
+    # Редкость (большая и цветная)
     rarity_emoji_map = {
-        "легендарный": "⭐ ЛЕГЕНДАРНЫЙ",
-        "эпический": "⭐ ЭПИЧЕСКИЙ",
-        "редкий": "🔵 РЕДКИЙ",
-        "обычный": "📘 ОБЫЧНЫЙ"
+        "легендарный": "👑",
+        "эпический": "⭐",
+        "редкий": "🔵",
+        "обычный": "📘"
     }
-    rarity_text = rarity_emoji_map.get(rarity, "ОБЫЧНЫЙ")
-    color = (255, 215, 0) if rarity == "легендарный" else (200, 200, 200)
-    draw.text((width//2, y_offset), rarity_text, fill=color, font=font_medium, anchor="mt")
+    rarity_labels = {
+        "легендарный": "ЛЕГЕНДАРНЫЙ",
+        "эпический": "ЭПИЧЕСКИЙ",
+        "редкий": "РЕДКИЙ",
+        "обычный": "ОБЫЧНЫЙ"
+    }
+    emoji = rarity_emoji_map.get(rarity, "📘")
+    label = rarity_labels.get(rarity, "ОБЫЧНЫЙ")
+    try:
+        font_rarity = ImageFont.truetype("arial.ttf", 30)
+    except:
+        font_rarity = ImageFont.load_default()
+    # Обводка для редкости
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        draw.text((width//2 + dx, y_offset + dy), f"{emoji} {label}", fill=(0,0,0), font=font_rarity, anchor="mt")
+    draw.text((width//2, y_offset), f"{emoji} {label}", fill=pal["rarity_color"], font=font_rarity, anchor="mt")
 
-    # Нижняя подпись
-    draw.text((width//2, height - 40), "🎴 Литературный Герой", fill=(80, 80, 80), font=font_small, anchor="mt")
+    # Нижний колонтитул
+    try:
+        font_footer = ImageFont.truetype("arial.ttf", 16)
+    except:
+        font_footer = ImageFont.load_default()
+    draw.text((width//2, height - 30), "🎴 Создано с любовью к литературе", fill=(100, 100, 100), font=font_footer, anchor="mt")
 
-    # Сохраняем в BytesIO
+    # Сохраняем
     bio = io.BytesIO()
     img.save(bio, format='PNG')
     bio.seek(0)
