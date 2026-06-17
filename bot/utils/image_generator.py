@@ -2,7 +2,28 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
+# Пути
 PORTRAITS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'portraits')
+FONTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
+
+def load_font(size, filename="arial.ttf"):
+    """Загружает шрифт с поддержкой кириллицы"""
+    try:
+        # Сначала ищем в папке проекта
+        font_path = os.path.join(FONTS_DIR, filename)
+        if os.path.exists(font_path):
+            return ImageFont.truetype(font_path, size)
+        # Если нет, пробуем системные шрифты (для Linux)
+        system_fonts = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 
+                       "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+                       "/System/Library/Fonts/Helvetica.ttc"]
+        for path in system_fonts:
+            if os.path.exists(path):
+                return ImageFont.truetype(path, size)
+        # Если ничего не найдено, используем стандартный (но без кириллицы)
+        return ImageFont.load_default()
+    except:
+        return ImageFont.load_default()
 
 def load_portrait(filename):
     if not filename:
@@ -67,15 +88,22 @@ def create_hero_card(hero):
 
     draw = ImageDraw.Draw(img)
 
-    # Рамка с двойной линией
+    # Шрифты (загружаем с поддержкой кириллицы)
+    font_title = load_font(30)
+    font_icon = load_font(100)
+    font_name = load_font(48)   # Увеличен размер
+    font_book = load_font(32)   # Увеличен размер
+    font_author = load_font(28) # Увеличен размер
+    font_rarity = load_font(36) # Увеличен размер
+    font_footer = load_font(18)
+
+    # Рамка
     border_width = 10
-    # Внешняя рамка
     draw.rectangle(
         [(border_width, border_width), (width - border_width, height - border_width)],
         outline=pal["border"],
         width=4
     )
-    # Внутренняя рамка
     inner_offset = border_width + 8
     draw.rectangle(
         [(inner_offset, inner_offset), (width - inner_offset, height - inner_offset)],
@@ -83,73 +111,48 @@ def create_hero_card(hero):
         width=2
     )
 
-    # Заголовок "Литературный Герой" сверху
-    try:
-        font_title = ImageFont.truetype("arial.ttf", 28)
-    except:
-        font_title = ImageFont.load_default()
+    # Заголовок
     draw.text((width//2, 20), "📖 ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # Портрет для легендарных
+    # Портрет (только для легендарных)
     portrait = None
     if rarity == "легендарный" and "portrait" in hero:
         portrait = load_portrait(hero["portrait"])
 
     if portrait:
-        # Масштабируем до 220x220
         portrait = portrait.resize((220, 220), Image.Resampling.LANCZOS)
-        # Круглая маска
         mask = Image.new('L', (220, 220), 0)
         mask_draw = ImageDraw.Draw(mask)
         mask_draw.ellipse((0, 0, 220, 220), fill=255)
         portrait.putalpha(mask)
-        # Центрируем
         x = (width - 220) // 2
         y = 80
         img.paste(portrait, (x, y), portrait)
-        # Золотая рамка вокруг портрета
         draw.ellipse((x-8, y-8, x+228, y+228), outline=pal["border"], width=6)
     else:
-        # Если портрета нет — показываем большую иконку
-        try:
-            font_icon = ImageFont.truetype("arial.ttf", 100)
-        except:
-            font_icon = ImageFont.load_default()
         draw.text((width//2, 140), "📜", fill=pal["border"], font=font_icon, anchor="mt")
 
     # Имя героя
-    try:
-        font_name = ImageFont.truetype("arial.ttf", 44)
-    except:
-        font_name = ImageFont.load_default()
     y_offset = 380 if portrait else 280
-    # Обводка имени (тень)
-    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+    # Тень
+    for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
         draw.text((width//2 + dx, y_offset + dy), hero["name"], fill=(0,0,0), font=font_name, anchor="mt")
     draw.text((width//2, y_offset), hero["name"], fill=pal["text"], font=font_name, anchor="mt")
 
     # Разделитель
-    y_offset += 55
+    y_offset += 60
     draw.line([(80, y_offset), (width - 80, y_offset)], fill=pal["accent"], width=2)
-    y_offset += 30
+    y_offset += 35
 
     # Книга
-    try:
-        font_book = ImageFont.truetype("arial.ttf", 26)
-    except:
-        font_book = ImageFont.load_default()
     draw.text((width//2, y_offset), f"📖 {hero['book']}", fill=(200, 200, 200), font=font_book, anchor="mt")
-    y_offset += 40
+    y_offset += 45
 
     # Автор
-    try:
-        font_author = ImageFont.truetype("arial.ttf", 22)
-    except:
-        font_author = ImageFont.load_default()
     draw.text((width//2, y_offset), f"✍️ {hero['author']}", fill=(180, 180, 180), font=font_author, anchor="mt")
-    y_offset += 55
+    y_offset += 65
 
-    # Редкость (большая и цветная)
+    # Редкость
     rarity_emoji_map = {
         "легендарный": "👑",
         "эпический": "⭐",
@@ -164,20 +167,13 @@ def create_hero_card(hero):
     }
     emoji = rarity_emoji_map.get(rarity, "📘")
     label = rarity_labels.get(rarity, "ОБЫЧНЫЙ")
-    try:
-        font_rarity = ImageFont.truetype("arial.ttf", 30)
-    except:
-        font_rarity = ImageFont.load_default()
-    # Обводка для редкости
-    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
-        draw.text((width//2 + dx, y_offset + dy), f"{emoji} {label}", fill=(0,0,0), font=font_rarity, anchor="mt")
-    draw.text((width//2, y_offset), f"{emoji} {label}", fill=pal["rarity_color"], font=font_rarity, anchor="mt")
+    rarity_text = f"{emoji} {label}"
+    # Тень
+    for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
+        draw.text((width//2 + dx, y_offset + dy), rarity_text, fill=(0,0,0), font=font_rarity, anchor="mt")
+    draw.text((width//2, y_offset), rarity_text, fill=pal["rarity_color"], font=font_rarity, anchor="mt")
 
-    # Нижний колонтитул
-    try:
-        font_footer = ImageFont.truetype("arial.ttf", 16)
-    except:
-        font_footer = ImageFont.load_default()
+    # Колонтитул
     draw.text((width//2, height - 30), "🎴 Создано с любовью к литературе", fill=(100, 100, 100), font=font_footer, anchor="mt")
 
     # Сохраняем
