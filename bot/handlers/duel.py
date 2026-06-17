@@ -369,4 +369,4 @@ def cancel_duel(duel_id: str):
     if duel:
         for pid in [duel.get("player1"), duel.get("player2")]:
             if pid in user_duel:
-                del user_duel[pid]ыы
+                del user_duel[pid]
