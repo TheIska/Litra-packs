@@ -110,13 +110,14 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
         [InlineKeyboardButton("🎁 Открыть другой пак", callback_data="shop")],
     ]
 
+    # Отправляем карточку (без анимации)
     if query:
-        # Удаляем исходное сообщение с кнопками (чтобы не оставалось старых кнопок)
+        # Удаляем исходное сообщение с кнопками, чтобы не оставалось старых
         try:
             await query.message.delete()
-        except Exception as e:
-            print(f"Не удалось удалить сообщение: {e}")
-        # Отправляем карточку новым сообщением
+        except Exception:
+            pass
+        # Отправляем новое сообщение с карточкой
         await context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=image_bytes,
@@ -125,7 +126,6 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        # Если команда не из кнопки (например, /free_pack) — просто карточка
         await update.message.reply_photo(
             photo=image_bytes,
             caption=caption,
