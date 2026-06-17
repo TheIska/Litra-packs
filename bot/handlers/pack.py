@@ -37,8 +37,6 @@ PACK_PRICES = {
 
 FREE_PACK_INTERVAL = timedelta(hours=3)
 
-GIF_URL = "https://media.tenor.com/2Lb0vKkL0bQAAAAi/sparkles.gif"
-
 def get_hero_by_rarity_weights(weights):
     groups = {"легендарный": [], "эпический": [], "редкий": [], "обычный": []}
     for h in HEROES:
@@ -99,24 +97,23 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     collection = get_collection(user_id)
     total = len(collection)
 
-    # Анимация (отдельным сообщением)
+    # ========== АНИМАЦИЯ (текстовая) ==========
     if query:
-        anim_msg = await context.bot.send_animation(
-            chat_id=chat_id,
-            animation=GIF_URL,
-            caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
+        # Редактируем исходное сообщение, показывая "открываем"
+        await query.edit_message_text(
+            f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
             parse_mode="Markdown"
         )
         await asyncio.sleep(1.5)
     else:
-        anim_msg = await update.message.reply_animation(
-            animation=GIF_URL,
-            caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
+        # Отправляем новое сообщение
+        msg = await update.message.reply_text(
+            f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
             parse_mode="Markdown"
         )
         await asyncio.sleep(1.5)
 
-    # Карточка
+    # ========== КАРТОЧКА ==========
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
@@ -135,18 +132,15 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     ]
 
     if query:
-        await context.bot.send_photo(
-            chat_id=chat_id,
-            photo=image_bytes,
-            caption=caption,
-            parse_mode="Markdown",
+        # Редактируем то же сообщение, заменяя текст на картинку
+        await query.edit_message_media(
+            media=InputMediaPhoto(
+                media=image_bytes,
+                caption=caption,
+                parse_mode="Markdown"
+            ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        # Удаляем исходное сообщение с кнопками
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except:
-            pass
     else:
         await update.message.reply_photo(
             photo=image_bytes,
