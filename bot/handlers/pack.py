@@ -1,7 +1,7 @@
 import random
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaAnimation
 from telegram.ext import ContextTypes
 from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
 from ..models.hero import HEROES
@@ -16,9 +16,9 @@ RARITY_EMOJIS = {
 
 PACK_NAMES = {
     "free": "📖 Дар читателя",
-    "small": "📚 Карманный фолиант",
-    "medium": "🔮 Тайная библиотека",
-    "large": "✨ Редчайший манускрипт"
+    "small": "📚 Маленький пак",
+    "medium": "🔮 Лишний пак",
+    "large": "✨ Новый пак"
 }
 
 PACK_RARITY_WEIGHTS = {
@@ -37,6 +37,7 @@ PACK_PRICES = {
 
 FREE_PACK_INTERVAL = timedelta(hours=3)
 
+# Анимированный GIF (можно заменить на свой)
 GIF_URL = "https://media.tenor.com/2Lb0vKkL0bQAAAAi/sparkles.gif"
 
 def get_hero_by_rarity_weights(weights):
@@ -60,6 +61,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
 
     user = get_user(user_id)
 
+    # Проверка для бесплатного пака
     if pack_type == "free":
         last = user.get("last_free_pack")
         if last:
@@ -68,34 +70,24 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
                 remaining = FREE_PACK_INTERVAL - (datetime.now() - last_time)
                 hours = int(remaining.total_seconds() // 3600)
                 minutes = int((remaining.total_seconds() % 3600) // 60)
+                msg = f"⏳ *Дар читателя* уже был открыт!\nСледующий через *{hours}ч {minutes}мин*."
                 if query:
-                    await query.edit_message_text(
-                        f"⏳ *Дар читателя* уже был открыт!\n"
-                        f"Следующий через *{hours}ч {minutes}мин*.",
-                        parse_mode="Markdown"
-                    )
+                    await query.edit_message_text(msg, parse_mode="Markdown")
                 else:
-                    await update.message.reply_text(
-                        f"⏳ *Дар читателя* уже был открыт!\n"
-                        f"Следующий через *{hours}ч {minutes}мин*.",
-                        parse_mode="Markdown"
-                    )
+                    await update.message.reply_text(msg, parse_mode="Markdown")
                 return
     else:
+        # Проверка монет
         price = PACK_PRICES[pack_type]
         if not spend_coins(user_id, price):
+            msg = f"❌ Недостаточно монет! Нужно *{price}*.\nТвой баланс: *{user['coins']}*"
             if query:
-                await query.edit_message_text(
-                    f"❌ Недостаточно монет! Нужно *{price}*.\nТвой баланс: *{user['coins']}*",
-                    parse_mode="Markdown"
-                )
+                await query.edit_message_text(msg, parse_mode="Markdown")
             else:
-                await update.message.reply_text(
-                    f"❌ Недостаточно монет! Нужно *{price}*.\nТвой баланс: *{user['coins']}*",
-                    parse_mode="Markdown"
-                )
+                await update.message.reply_text(msg, parse_mode="Markdown")
             return
 
+    # Выбор героя
     weights = PACK_RARITY_WEIGHTS[pack_type]
     hero = get_hero_by_rarity_weights(weights)
     add_hero_to_collection(user_id, hero)
@@ -105,16 +97,17 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     collection = get_collection(user_id)
     total = len(collection)
 
-    # Анимация
+    # ========== АНИМАЦИЯ ==========
+    # Отправляем GIF с анимацией
     if query:
         await query.edit_message_media(
-            media=InputMediaPhoto(
+            media=InputMediaAnimation(
                 media=GIF_URL,
                 caption=f"🎴 *Открываем {PACK_NAMES[pack_type]}...*",
                 parse_mode="Markdown"
             )
         )
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(1.5)  # Пауза для анимации
     else:
         await update.message.reply_animation(
             animation=GIF_URL,
@@ -123,7 +116,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
         )
         await asyncio.sleep(1.5)
 
-    # Карточка
+    # ========== КАРТОЧКА ==========
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
