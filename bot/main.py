@@ -10,6 +10,7 @@ from .handlers.duel import (
     card_selection_callback,
     answer_callback
 )
+from .handlers.admin import add_coins_command  # <-- импорт админ-команды
 from .web.server import keep_alive
 
 logging.basicConfig(
@@ -23,12 +24,13 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Команды
+    # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
+    app.add_handler(CommandHandler("addcoins", add_coins_command))  # <-- админ-команда
 
-    # Callback'и
+    # ========== CALLBACK'И ==========
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
     app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
