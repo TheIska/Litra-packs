@@ -1,35 +1,56 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_collection
 
 async def show_collection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обработчик команды /collection и callback 'collection'.
-    Показывает список всех героев в коллекции пользователя.
-    """
+    """Показывает коллекцию героев пользователя"""
     query = update.callback_query
     if query:
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            pass  # Если callback уже просрочен, просто игнорируем
         user_id = query.from_user.id
-        send_message = query.edit_message_text
+        chat_id = query.message.chat_id
+        is_photo = query.message.photo
     else:
         user_id = update.effective_user.id
-        send_message = update.message.reply_text
+        chat_id = update.effective_chat.id
+        is_photo = False
 
     collection = get_collection(user_id)
 
     if not collection:
-        await send_message(
-            "📭 *Коллекция пуста*\n\n"
-            "Открой свой первый пак — нажми кнопку «Открыть пак»!",
-            parse_mode="Markdown"
-        )
+        msg = "📭 *Коллекция пуста*\n\nОткрой свой первый пак — нажми кнопку «Открыть пак»!"
+        keyboard = [[InlineKeyboardButton("🎁 Открыть пак", callback_data="free_pack")]]
+        if query:
+            if is_photo:
+                try:
+                    await query.message.delete()
+                except Exception:
+                    pass
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=msg,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                try:
+                    await query.edit_message_text(
+                        msg,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                except Exception:
+                    pass
+        else:
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # Формируем текст
+    # Формируем текст коллекции
     text = "🌟 *Твоя коллекция героев:*\n\n"
-    # Сортируем по редкости (эпические → редкие → обычные)
-    rarity_order = {"эпический": 0, "редкий": 1, "обычный": 2}
+    rarity_order = {"эпический": 0, "редкий": 1, "обычный": 2, "легендарный": -1}
     sorted_heroes = sorted(
         collection.values(),
         key=lambda h: (rarity_order.get(h.get("rarity", "обычный"), 3), h["name"])
@@ -39,19 +60,37 @@ async def show_collection(update: Update, context: ContextTypes.DEFAULT_TYPE):
         emoji = {
             "эпический": "⭐",
             "редкий": "🔵",
-            "обычный": "📘"
+            "обычный": "📘",
+            "легендарный": "👑"
         }.get(hero.get("rarity", "обычный"), "📘")
         text += f"{emoji} *{hero['name']}* — {hero['book']} ({hero['rarity']})\n"
 
-    # Ограничим длину, если слишком много героев
     if len(text) > 4000:
         text = text[:4000] + "\n\n...и ещё много героев!"
 
-    # Кнопка "Назад" или "Открыть пак"
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     keyboard = [[InlineKeyboardButton("🎁 Открыть пак", callback_data="free_pack")]]
-    await send_message(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if query:
+        if is_photo:
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            try:
+                await query.edit_message_text(
+                    text,
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+            except Exception:
+                pass
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
