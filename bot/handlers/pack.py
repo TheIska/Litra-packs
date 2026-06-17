@@ -1,11 +1,12 @@
 import random
+import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
-from ..database import get_user, add_hero_to_collection, update_last_free_pack
+from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection
 from ..models.hero import HEROES
+from ..utils.image_generator import create_hero_card
 
-# Эмодзи для редкостей
 RARITY_EMOJIS = {
     "обычный": "📘",
     "редкий": "🔵",
@@ -13,20 +14,16 @@ RARITY_EMOJIS = {
     "легендарный": "⭐",
 }
 
+# Ссылка на GIF (можно заменить на свою)
+GIF_URL = "https://media.tenor.com/2Lb0vKkL0bQAAAAi/sparkles.gif"
+
 async def free_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обработчик открытия бесплатного пака (callback 'free_pack' или команда /free_pack).
-    Проверяет, прошло ли 24 часа с последнего открытия, выдаёт случайного героя.
-    """
-    # Определяем, откуда пришёл запрос (callback или команда)
     query = update.callback_query
     if query:
         await query.answer()
         user_id = query.from_user.id
-        send_message = query.edit_message_text
     else:
         user_id = update.effective_user.id
-        send_message = update.message.reply_text
 
     user = get_user(user_id)
 
@@ -38,55 +35,81 @@ async def free_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remaining = timedelta(hours=24) - (datetime.now() - last_time)
             hours = int(remaining.total_seconds() // 3600)
             minutes = int((remaining.total_seconds() % 3600) // 60)
-            await send_message(
-                f"⏳ *Ты уже открывал бесплатный пак сегодня!*\n"
-                f"Следующий будет доступен через *{hours}ч {minutes}мин*.\n\n"
-                "Попробуй завтра!",
-                parse_mode="Markdown"
-            )
+            if query:
+                await query.edit_message_text(
+                    f"⏳ *Ты уже открывал бесплатный пак сегодня!*\n"
+                    f"Следующий будет доступен через *{hours}ч {minutes}мин*.",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    f"⏳ *Ты уже открывал бесплатный пак сегодня!*\n"
+                    f"Следующий будет доступен через *{hours}ч {minutes}мин*.",
+                    parse_mode="Markdown"
+                )
             return
 
-    # Выбор случайного героя (можно добавить взвешенную редкость, но пока равномерно)
+    # Выбор случайного героя
     hero = random.choice(HEROES)
-    hero_key = f"{hero['author']} – {hero['name']}"
 
     # Сохраняем в коллекцию
     add_hero_to_collection(user_id, hero)
     update_last_free_pack(user_id, datetime.now())
 
-    # Получаем обновлённый размер коллекции
-    from ..database import get_collection
     collection = get_collection(user_id)
     total = len(collection)
 
-    # Эмодзи редкости
-    emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
-
-    # Формируем сообщение
-    message = (
-        f"🎉 *Тебе выпал {hero['rarity']} герой!*\n\n"
-        f"{emoji} *{hero['name']}*\n"
-        f"📖 *{hero['book']}*\n"
-        f"✍️ *{hero['author']}*\n\n"
-        f"📊 В твоей коллекции *{total}* героев."
-    )
-
-    # Кнопки для продолжения
-    keyboard = [
-        [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
-        [InlineKeyboardButton("🎁 Открыть ещё (платно, в разработке)", callback_data="paid_pack")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
+    # ========== АНИМАЦИЯ ==========
     if query:
-        await query.edit_message_text(
-            message,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
+        # Отправляем GIF с текстом
+        await query.edit_message_media(
+            media=InputMediaPhoto(media=GIF_URL, caption="🎴 *Открываем пак...*"),
+            parse_mode="Markdown"
+        )
+        # Ждём 1.5 секунды
+        await asyncio.sleep(1.5)
+
+        # Генерируем карточку
+        image_bytes = create_hero_card(hero)
+
+        # Формируем подпись
+        emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
+        caption = (
+            f"🎉 *Тебе выпал {hero['rarity']} герой!*\n\n"
+            f"{emoji} *{hero['name']}*\n"
+            f"📖 *{hero['book']}*\n"
+            f"✍️ *{hero['author']}*\n\n"
+            f"📊 В твоей коллекции *{total}* героев."
+        )
+
+        keyboard = [
+            [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
+            [InlineKeyboardButton("🎁 Открыть ещё", callback_data="free_pack")],
+        ]
+
+        # Редактируем то же сообщение — заменяем GIF на карточку
+        await query.edit_message_media(
+            media=InputMediaPhoto(media=image_bytes, caption=caption, parse_mode="Markdown"),
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        await send_message(
-            message,
+        # Если команда пришла не из кнопки (например, /free_pack) — просто карточка без анимации
+        image_bytes = create_hero_card(hero)
+        emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
+        caption = (
+            f"🎉 *Тебе выпал {hero['rarity']} герой!*\n\n"
+            f"{emoji} *{hero['name']}*\n"
+            f"📖 *{hero['book']}*\n"
+            f"✍️ *{hero['author']}*\n\n"
+            f"📊 В твоей коллекции *{total}* героев."
+        )
+        keyboard = [
+            [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
+            [InlineKeyboardButton("🎁 Открыть ещё", callback_data="free_pack")],
+        ]
+        await update.message.reply_photo(
+            photo=image_bytes,
+            caption=caption,
             parse_mode="Markdown",
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
