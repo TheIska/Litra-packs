@@ -45,7 +45,7 @@ def main():
     # Коллекция
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
 
-    # Дуэли (используем паттерны с |)
+    # Дуэли
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^a|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b|"))
