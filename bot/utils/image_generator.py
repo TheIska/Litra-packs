@@ -1,9 +1,12 @@
 import io
 import os
-import requests
+import urllib.request
+import urllib.error
 from PIL import Image, ImageDraw, ImageFont
+import json
 
-# Путь к папке со шрифтами
+# Путь к папкам
+COVERS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'covers')
 FONTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
 
 def load_font(size):
@@ -17,30 +20,49 @@ def load_font(size):
     except:
         return ImageFont.load_default()
 
-def get_cover_from_google(book_name):
-    """Ищет обложку книги через Google Books API"""
+def load_cover(book_name):
+    """Загружает обложку книги: сначала локально, потом из интернета через Google Books API"""
+    clean_name = book_name.replace('"', '').replace('«', '').replace('»', '').replace('?', '').replace('!', '')
+    
+    # 1. Пробуем локально
+    extensions = ['.jpg', '.jpeg', '.png', '.webp']
+    for ext in extensions:
+        path = os.path.join(COVERS_DIR, f"{clean_name}{ext}")
+        if os.path.exists(path):
+            try:
+                return Image.open(path).convert("RGBA")
+            except:
+                pass
+    
+    # 2. Ищем через Google Books API (через urllib)
     try:
-        # Ищем книгу
-        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{book_name}&maxResults=1"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
+        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{urllib.parse.quote(book_name)}&maxResults=1"
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode())
             if 'items' in data and len(data['items']) > 0:
                 volume = data['items'][0]['volumeInfo']
                 if 'imageLinks' in volume:
                     cover_url = volume['imageLinks'].get('thumbnail')
                     if cover_url:
                         # Скачиваем обложку
-                        img_response = requests.get(cover_url, timeout=5)
-                        if img_response.status_code == 200:
-                            return Image.open(io.BytesIO(img_response.content)).convert("RGBA")
+                        with urllib.request.urlopen(cover_url, timeout=5) as img_response:
+                            img_data = img_response.read()
+                            img = Image.open(io.BytesIO(img_data)).convert("RGBA")
+                            # Сохраняем локально, чтобы не качать каждый раз
+                            try:
+                                os.makedirs(COVERS_DIR, exist_ok=True)
+                                local_path = os.path.join(COVERS_DIR, f"{clean_name}.jpg")
+                                img.save(local_path, 'JPEG')
+                            except:
+                                pass
+                            return img
     except Exception as e:
-        print(f"Ошибка загрузки обложки для {book_name}: {e}")
+        print(f"Не удалось загрузить обложку для {book_name}: {e}")
     
     return None
 
 def create_hero_card(hero):
-    """Создаёт карточку героя с обложкой из интернета"""
+    """Создаёт карточку героя с обложкой книги"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
@@ -101,8 +123,8 @@ def create_hero_card(hero):
     # Заголовок
     draw.text((width//2, 15), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # Обложка книги (из интернета)
-    cover_img = get_cover_from_google(hero["book"])
+    # Обложка книги
+    cover_img = load_cover(hero["book"])
     if cover_img:
         cover_img = cover_img.resize((180, 250), Image.Resampling.LANCZOS)
         x = (width - 180) // 2
