@@ -8,12 +8,10 @@ FONTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
 def load_font(size):
     """Загружает шрифт с поддержкой кириллицы из локальной папки"""
     try:
-        # Ищем шрифт в папке fonts
         if os.path.exists(FONTS_DIR):
             for f in os.listdir(FONTS_DIR):
                 if f.endswith('.ttf') or f.endswith('.otf'):
                     return ImageFont.truetype(os.path.join(FONTS_DIR, f), size)
-        # Если ничего не найдено — стандартный шрифт (без кириллицы)
         return ImageFont.load_default()
     except Exception as e:
         print(f"Ошибка загрузки шрифта: {e}")
@@ -32,7 +30,6 @@ def create_hero_card(hero):
     width, height = 600, 800
     rarity = hero.get("rarity", "обычный")
 
-    # Цвета для разных редкостей
     colors = {
         "легендарный": {
             "bg_start": (60, 40, 20),
@@ -82,7 +79,7 @@ def create_hero_card(hero):
 
     draw = ImageDraw.Draw(img)
 
-    # Загружаем шрифты
+    # Шрифты
     font_title = load_font(30)
     font_icon = load_font(100)
     font_name = load_font(48)
@@ -108,7 +105,7 @@ def create_hero_card(hero):
     # Заголовок
     draw.text((width//2, 20), "📖 ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # Портрет (только для легендарных)
+    # Портрет
     portrait = None
     if rarity == "легендарный" and "portrait" in hero:
         portrait = load_portrait(hero["portrait"])
@@ -168,7 +165,6 @@ def create_hero_card(hero):
     # Колонтитул
     draw.text((width//2, height - 30), "🎴 Создано с любовью к литературе", fill=(100, 100, 100), font=font_footer, anchor="mt")
 
-    # Сохраняем
     bio = io.BytesIO()
     img.save(bio, format='PNG')
     bio.seek(0)
