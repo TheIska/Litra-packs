@@ -7,9 +7,8 @@ from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
-    stop_duel_command,
-    selection_callback,
-    answer_callback
+    answer_callback,
+    stop_duel_command
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -29,7 +28,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
-    app.add_handler(CommandHandler("stopduel", stop_duel_command))  # <-- НОВАЯ КОМАНДА
+    app.add_handler(CommandHandler("stopduel", stop_duel_command))
     app.add_handler(CommandHandler("addcoins", add_coins_command))
 
     # Меню
@@ -48,10 +47,6 @@ def main():
 
     # Дуэли
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^sel_"))
-    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^nav_"))
-    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^rdy_"))
-    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^rst_"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans_"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^bon_"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^sur_"))
