@@ -29,7 +29,7 @@ def load_font(size, style="regular"):
         return ImageFont.load_default()
 
 def create_hero_card(hero):
-    """Создаёт карточку героя с центральным акцентом"""
+    """Создаёт карточку героя без декоративных символов"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
@@ -93,7 +93,6 @@ def create_hero_card(hero):
     font_author = load_font(22, "italic")
     font_rare = load_font(28, "bold")
     font_footer = load_font(18, "italic")
-    font_deco = load_font(30, "regular")
 
     # 1. РАМКА (двойная)
     border = 8
@@ -103,12 +102,10 @@ def create_hero_card(hero):
     # 2. ВЕРХНИЙ ЗАГОЛОВОК
     draw.text((width//2, 18), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # 3. ДЕКОРАТИВНАЯ ЛИНИЯ
+    # 3. РАЗДЕЛИТЕЛЬ (только линия)
     y = 50
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
-    y += 10
-    draw.text((width//2, y), "~", fill=pal["border"], font=font_deco, anchor="mt")
-    y += 15
+    y += 25
 
     # 4. ИМЯ ГЕРОЯ — ЦЕНТР
     name = hero["name"]
@@ -119,29 +116,22 @@ def create_hero_card(hero):
     
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
-    # 5. ДЕКОРАТИВНЫЙ УЗОР ВОКРУГ ИМЕНИ
-    deco_y = name_y
-    draw.text((width//2 - 180, deco_y), "*", fill=pal["accent"], font=font_deco, anchor="mt")
-    draw.text((width//2 + 180, deco_y), "*", fill=pal["accent"], font=font_deco, anchor="mt")
-    
-    # 6. РАЗДЕЛИТЕЛЬ
+    # 5. РАЗДЕЛИТЕЛЬ (только линия)
     y = height // 2 + 40
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
-    y += 15
-    draw.text((width//2, y), "~", fill=pal["accent"], font=font_deco, anchor="mt")
-    y += 25
+    y += 40
 
-    # 7. КНИГА
+    # 6. КНИГА
     book = hero["book"]
     draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
     y += 32
 
-    # 8. АВТОР
+    # 7. АВТОР
     author = hero["author"]
     draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
     y += 50
 
-    # 9. РЕДКОСТЬ
+    # 8. РЕДКОСТЬ
     rare_labels = {
         "легендарный": "ЛЕГЕНДАРНЫЙ",
         "эпический": "ЭПИЧЕСКИЙ",
@@ -151,7 +141,7 @@ def create_hero_card(hero):
     rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
 
-    # 10. НИЖНИЙ КОЛОНТИТУЛ
+    # 9. НИЖНИЙ КОЛОНТИТУЛ
     draw.text((width//2, height - 22), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
 
     # Сохраняем
