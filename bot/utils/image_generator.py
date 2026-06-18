@@ -35,7 +35,6 @@ def load_portrait(hero):
     if hero.get("rarity") != "легендарный":
         return None
     
-    # Только 5 героев
     portrait_map = {
         "Александр Пушкин": "pushkin.png",
         "Михаил Лермонтов": "lermontov.png",
@@ -164,17 +163,19 @@ def create_hero_card(hero):
     if is_legendary:
         portrait = load_portrait(hero)
         if portrait:
-            portrait = portrait.resize((120, 120), Image.Resampling.LANCZOS)
-            mask = Image.new('L', (120, 120), 0)
+            # Увеличиваем портрет до 160x160 (было 120)
+            portrait = portrait.resize((160, 160), Image.Resampling.LANCZOS)
+            mask = Image.new('L', (160, 160), 0)
             mask_draw = ImageDraw.Draw(mask)
-            mask_draw.ellipse((0, 0, 120, 120), fill=255)
+            mask_draw.ellipse((0, 0, 160, 160), fill=255)
             portrait.putalpha(mask)
-            x = (width - 120) // 2
-            y_portrait = 85
+            x = (width - 160) // 2
+            y_portrait = 75  # Поднял чуть выше
             img.paste(portrait, (x, y_portrait), portrait)
-            draw.ellipse([(x-5, y_portrait-5), (x+125, y_portrait+125)], outline=pal["border"], width=3)
-            cover_offset = 130
-            name_offset = 100
+            # Рамка вокруг портрета
+            draw.ellipse([(x-5, y_portrait-5), (x+165, y_portrait+165)], outline=pal["border"], width=4)
+            cover_offset = 150  # Смещаем обложку вниз
+            name_offset = 80    # Смещаем имя вниз (но поднимаем текст, уменьшая offset)
         else:
             cover_offset = 0
             name_offset = 0
@@ -190,10 +191,14 @@ def create_hero_card(hero):
         y_cover = 90 + cover_offset
         img.paste(cover_img, (x, y_cover), cover_img)
         draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
-        name_y = 310 + name_offset
+        # Поднимаем текст выше (уменьшаем name_y)
+        if is_legendary and portrait:
+            name_y = 280  # Поднял текст (было 310 + name_offset)
+        else:
+            name_y = 310
     else:
         if is_legendary and portrait:
-            name_y = 310 + 60
+            name_y = 280  # Поднял текст
         else:
             name_y = height // 2 - 50
 
@@ -206,17 +211,17 @@ def create_hero_card(hero):
     # РАЗДЕЛИТЕЛЬ
     y = name_y + 50
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
-    y += 40
+    y += 35
 
     # КНИГА
     book = hero["book"]
     draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
-    y += 32
+    y += 30
 
     # АВТОР
     author = hero["author"]
     draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
-    y += 50
+    y += 45
 
     # РЕДКОСТЬ
     rare_labels = {
