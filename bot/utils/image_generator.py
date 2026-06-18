@@ -30,10 +30,35 @@ def load_font(size, style="regular"):
     except:
         return ImageFont.load_default()
 
+def load_portrait(hero):
+    """Загружает портрет для легендарного героя"""
+    if hero.get("rarity") != "легендарный":
+        return None
+    
+    # Только 5 героев
+    portrait_map = {
+        "Александр Пушкин": "pushkin.png",
+        "Михаил Лермонтов": "lermontov.png",
+        "Николай Гоголь": "gogol.png",
+        "Фёдор Достоевский": "dostoevsky.png",
+        "Иван Тургенев": "turgenev.png",
+    }
+    
+    filename = portrait_map.get(hero["name"])
+    if not filename:
+        return None
+    
+    portrait_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'portraits', filename)
+    if os.path.exists(portrait_path):
+        try:
+            return Image.open(portrait_path).convert("RGBA")
+        except:
+            return None
+    return None
+
 def load_cover(book_name):
-    """Загружает обложку книги из интернета через Google Books API"""
+    """Загружает обложку книги через Google Books API"""
     try:
-        # Кодируем название для URL
         import urllib.parse
         encoded_name = urllib.parse.quote(book_name)
         url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{encoded_name}&maxResults=1"
@@ -55,9 +80,10 @@ def load_cover(book_name):
     return None
 
 def create_hero_card(hero):
-    """Создаёт карточку героя с обложкой книги"""
+    """Создаёт карточку героя с обложкой и портретом для легендарных"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
+    is_legendary = (rarity == "легендарный")
 
     # Цвета
     colors = {
@@ -120,57 +146,79 @@ def create_hero_card(hero):
     font_rare = load_font(28, "bold")
     font_footer = load_font(18, "italic")
 
-    # 1. РАМКА
+    # РАМКА
     border = 8
     draw.rectangle([(border, border), (width - border, height - border)], outline=pal["border"], width=3)
     draw.rectangle([(border + 12, border + 12), (width - border - 12, height - border - 12)], outline=pal["border"], width=1)
 
-    # 2. ЗАГОЛОВОК
+    # ЗАГОЛОВОК
     draw.text((width//2, 22), "LITRA PACKS", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # 3. РАЗДЕЛИТЕЛЬ
+    # РАЗДЕЛИТЕЛЬ
     y = 55
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
     y += 25
 
-    # 4. ОБЛОЖКА КНИГИ (в центре, над именем)
+    # ПОРТРЕТ (только для легендарных)
+    portrait = None
+    if is_legendary:
+        portrait = load_portrait(hero)
+        if portrait:
+            portrait = portrait.resize((120, 120), Image.Resampling.LANCZOS)
+            mask = Image.new('L', (120, 120), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.ellipse((0, 0, 120, 120), fill=255)
+            portrait.putalpha(mask)
+            x = (width - 120) // 2
+            y_portrait = 85
+            img.paste(portrait, (x, y_portrait), portrait)
+            draw.ellipse([(x-5, y_portrait-5), (x+125, y_portrait+125)], outline=pal["border"], width=3)
+            cover_offset = 130
+            name_offset = 100
+        else:
+            cover_offset = 0
+            name_offset = 0
+    else:
+        cover_offset = 0
+        name_offset = 0
+
+    # ОБЛОЖКА КНИГИ
     cover_img = load_cover(hero["book"])
     if cover_img:
-        # Уменьшаем обложку до 130x190
         cover_img = cover_img.resize((130, 190), Image.Resampling.LANCZOS)
         x = (width - 130) // 2
-        y_cover = 90
+        y_cover = 90 + cover_offset
         img.paste(cover_img, (x, y_cover), cover_img)
-        # Рамка вокруг обложки
         draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
-        # Смещаем имя вниз, чтобы не наезжало на обложку
-        name_y = 310
+        name_y = 310 + name_offset
     else:
-        # Если обложки нет — имя остаётся по центру
-        name_y = height // 2 - 50
+        if is_legendary and portrait:
+            name_y = 310 + 60
+        else:
+            name_y = height // 2 - 50
 
-    # 5. ИМЯ ГЕРОЯ
+    # ИМЯ ГЕРОЯ
     name = hero["name"]
     for dx, dy in [(-3,-3), (-3,3), (3,-3), (3,3)]:
         draw.text((width//2 + dx, name_y + dy), name, fill=(0, 0, 0), font=font_name, anchor="mt")
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
-    # 6. РАЗДЕЛИТЕЛЬ
+    # РАЗДЕЛИТЕЛЬ
     y = name_y + 50
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
     y += 40
 
-    # 7. КНИГА
+    # КНИГА
     book = hero["book"]
     draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
     y += 32
 
-    # 8. АВТОР
+    # АВТОР
     author = hero["author"]
     draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
     y += 50
 
-    # 9. РЕДКОСТЬ
+    # РЕДКОСТЬ
     rare_labels = {
         "легендарный": "ЛЕГЕНДАРНЫЙ",
         "эпический": "ЭПИЧЕСКИЙ",
@@ -180,7 +228,7 @@ def create_hero_card(hero):
     rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
 
-    # 10. НИЖНИЙ КОЛОНТИТУЛ
+    # НИЖНИЙ КОЛОНТИТУЛ
     draw.text((width//2, height - 22), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
 
     # Сохраняем
