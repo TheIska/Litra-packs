@@ -1,5 +1,6 @@
 import io
 import os
+import random
 import urllib.request
 import json
 from PIL import Image, ImageDraw, ImageFont
@@ -29,6 +30,48 @@ def load_font(size, style="regular"):
         return ImageFont.load_default()
     except:
         return ImageFont.load_default()
+
+def get_random_quote(author):
+    """Возвращает случайную цитату для автора"""
+    quotes = {
+        "А.С. Пушкин": [
+            "Я жить хочу, чтоб мыслить и страдать.",
+            "Гений и злодейство — две вещи несовместимые.",
+            "Вдохновение — это умение приводить себя в рабочее состояние.",
+            "Первый признак умного человека — с первого взгляда знать, с кем имеешь дело.",
+            "Привычка свыше нам дана, замена счастию она."
+        ],
+        "М.Ю. Лермонтов": [
+            "Гений, прикованный к чиновничьему столу, должен умереть или сойти с ума.",
+            "Поверь мне — счастье только там, где любят нас, где верят нам!",
+            "Из двух друзей всегда один раб другого.",
+            "Я люблю сомневаться во всем: это расположение ума не мешает решительности характера."
+        ],
+        "Н.В. Гоголь": [
+            "Какой же русский не любит быстрой езды?",
+            "Есть у русского человека враг, непримиримый, опасный враг, не будь которого он был бы исполином. Враг этот — лень.",
+            "Нет слова, которое было бы так замашисто, бойко, так вырывалось бы из-под самого сердца, как метко сказанное русское слово.",
+            "Обращаться со словами нужно честно.",
+            "В каждом слове бездна пространства, каждое слово необъятно."
+        ],
+        "Ф.М. Достоевский": [
+            "Человек есть тайна. Ее надо разгадать, и ежели будешь разгадывать ее всю жизнь, то не говори, что потерял время.",
+            "Если Бога нет, то всё позволено.",
+            "Безответная любовь не унижает человека, а возвышает его.",
+            "Станьте солнцем, вас все и увидят.",
+            "Красота спасет мир."
+        ],
+        "И.С. Тургенев": [
+            "Во дни сомнений, во дни тягостных раздумий о судьбах моей родины, — ты один мне поддержка и опора, о великий, могучий, правдивый и свободный русский язык!",
+            "Любовь сильнее смерти и страха смерти. Только ею, только любовью держится и движется жизнь.",
+            "Счастье — как здоровье: когда его не замечаешь, значит, оно есть.",
+            "Нет ничего тягостнее сознания только что сделанной глупости.",
+            "Добро по указу — не добро."
+        ]
+    }
+    
+    author_quotes = quotes.get(author, ["С любовью к литературе"])
+    return random.choice(author_quotes)
 
 def load_portrait(hero):
     """Загружает портрет для легендарного героя"""
@@ -83,6 +126,7 @@ def create_hero_card(hero):
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
+    author = hero.get("author", "")
 
     # Цвета
     colors = {
@@ -144,6 +188,7 @@ def create_hero_card(hero):
     font_author = load_font(22, "italic")
     font_rare = load_font(28, "bold")
     font_footer = load_font(18, "italic")
+    font_quote = load_font(16, "italic")
 
     # РАМКА
     border = 8
@@ -163,19 +208,17 @@ def create_hero_card(hero):
     if is_legendary:
         portrait = load_portrait(hero)
         if portrait:
-            # Увеличиваем портрет до 160x160 (было 120)
-            portrait = portrait.resize((160, 160), Image.Resampling.LANCZOS)
-            mask = Image.new('L', (160, 160), 0)
+            portrait = portrait.resize((180, 180), Image.Resampling.LANCZOS)
+            mask = Image.new('L', (180, 180), 0)
             mask_draw = ImageDraw.Draw(mask)
-            mask_draw.ellipse((0, 0, 160, 160), fill=255)
+            mask_draw.ellipse((0, 0, 180, 180), fill=255)
             portrait.putalpha(mask)
-            x = (width - 160) // 2
-            y_portrait = 75  # Поднял чуть выше
+            x = (width - 180) // 2
+            y_portrait = 70
             img.paste(portrait, (x, y_portrait), portrait)
-            # Рамка вокруг портрета
-            draw.ellipse([(x-5, y_portrait-5), (x+165, y_portrait+165)], outline=pal["border"], width=4)
-            cover_offset = 150  # Смещаем обложку вниз
-            name_offset = 80    # Смещаем имя вниз (но поднимаем текст, уменьшая offset)
+            draw.ellipse([(x-5, y_portrait-5), (x+185, y_portrait+185)], outline=pal["border"], width=4)
+            cover_offset = 160
+            name_offset = 70
         else:
             cover_offset = 0
             name_offset = 0
@@ -191,14 +234,13 @@ def create_hero_card(hero):
         y_cover = 90 + cover_offset
         img.paste(cover_img, (x, y_cover), cover_img)
         draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
-        # Поднимаем текст выше (уменьшаем name_y)
         if is_legendary and portrait:
-            name_y = 280  # Поднял текст (было 310 + name_offset)
+            name_y = 270
         else:
             name_y = 310
     else:
         if is_legendary and portrait:
-            name_y = 280  # Поднял текст
+            name_y = 270
         else:
             name_y = height // 2 - 50
 
@@ -211,17 +253,17 @@ def create_hero_card(hero):
     # РАЗДЕЛИТЕЛЬ
     y = name_y + 50
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
-    y += 35
+    y += 30
 
     # КНИГА
     book = hero["book"]
     draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
-    y += 30
+    y += 28
 
     # АВТОР
     author = hero["author"]
     draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
-    y += 45
+    y += 30
 
     # РЕДКОСТЬ
     rare_labels = {
@@ -232,9 +274,40 @@ def create_hero_card(hero):
     }
     rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
+    y += 35
+
+    # ЦИТАТА (только для легендарных, если есть портрет)
+    if is_legendary and portrait:
+        quote = get_random_quote(hero.get("author", ""))
+        # Разбиваем цитату на строки по 35 символов
+        words = quote.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if len(current_line) + len(word) + 1 <= 35:
+                current_line += word + " "
+            else:
+                lines.append(current_line.strip())
+                current_line = word + " "
+        if current_line:
+            lines.append(current_line.strip())
+        
+        # Рисуем рамку для цитаты
+        quote_box_y = y - 5
+        quote_height = len(lines) * 22 + 20
+        draw.rectangle([(30, quote_box_y), (width - 30, quote_box_y + quote_height)], outline=pal["border"], width=1, fill=(0, 0, 0, 50))
+        
+        # Рисуем цитату
+        for i, line in enumerate(lines):
+            draw.text((width//2, y + i * 22), f'"{line}"', fill=pal["sub"], font=font_quote, anchor="mt")
+        
+        y += len(lines) * 22 + 30
+        footer_y = height - 22
+    else:
+        footer_y = height - 22
 
     # НИЖНИЙ КОЛОНТИТУЛ
-    draw.text((width//2, height - 22), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
+    draw.text((width//2, footer_y), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
 
     # Сохраняем
     bio = io.BytesIO()
