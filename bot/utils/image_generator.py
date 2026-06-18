@@ -189,9 +189,9 @@ def create_hero_card(hero):
     draw.text((width//2, 22), "LITRA PACKS", fill=pal["accent"], font=font_title, anchor="mt")
 
     # РАЗДЕЛИТЕЛЬ
-    y = 55
+    y = 60
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
-    y += 30
+    y += 35
 
     # ПОРТРЕТ (только для легендарных)
     portrait = None
@@ -204,10 +204,10 @@ def create_hero_card(hero):
             mask_draw.ellipse((0, 0, 180, 180), fill=255)
             portrait.putalpha(mask)
             x = (width - 180) // 2
-            y_portrait = 70
+            y_portrait = 75
             img.paste(portrait, (x, y_portrait), portrait)
             draw.ellipse([(x-5, y_portrait-5), (x+185, y_portrait+185)], outline=pal["border"], width=4)
-            name_y = 290
+            name_y = 300
         else:
             name_y = height // 2 - 50
     else:
@@ -216,10 +216,10 @@ def create_hero_card(hero):
         if cover_img:
             cover_img = cover_img.resize((130, 190), Image.Resampling.LANCZOS)
             x = (width - 130) // 2
-            y_cover = 90
+            y_cover = 95
             img.paste(cover_img, (x, y_cover), cover_img)
             draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
-            name_y = 310
+            name_y = 320
         else:
             name_y = height // 2 - 50
 
@@ -230,16 +230,16 @@ def create_hero_card(hero):
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
     # РАЗДЕЛИТЕЛЬ
-    y = name_y + 50
+    y = name_y + 55
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
-    y += 35
+    y += 40
 
     # ДЛЯ ЛЕГЕНДАРНЫХ: годы жизни и цитата
     if is_legendary and portrait:
         # Годы жизни
         years = get_years(hero.get("author", ""))
         draw.text((width//2, y), years, fill=pal["sub"], font=font_years, anchor="mt")
-        y += 32
+        y += 35
         
         # Цитата
         quote = get_random_quote(hero.get("author", ""))
@@ -258,16 +258,16 @@ def create_hero_card(hero):
         for i, line in enumerate(lines):
             draw.text((width//2, y + i * 22), f'"{line}"', fill=pal["sub"], font=font_quote, anchor="mt")
         
-        y += len(lines) * 22 + 35
+        y += len(lines) * 22 + 40
         footer_y = height - 22
     else:
         # ДЛЯ НЕ ЛЕГЕНДАРНЫХ: книга и автор
         book = hero["book"]
         draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
-        y += 30
+        y += 32
         author = hero["author"]
         draw.text((width//2, y), author, fill=pal["sub"], font=font_author_style, anchor="mt")
-        y += 35
+        y += 38
         footer_y = height - 22
 
     # РЕДКОСТЬ
@@ -288,3 +288,26 @@ def create_hero_card(hero):
     img.save(bio, format='JPEG', quality=92, optimize=True)
     bio.seek(0)
     return bio
+
+def load_cover(book_name):
+    """Загружает обложку книги через Google Books API"""
+    try:
+        import urllib.parse
+        encoded_name = urllib.parse.quote(book_name)
+        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{encoded_name}&maxResults=1"
+        
+        with urllib.request.urlopen(url, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if 'items' in data and len(data['items']) > 0:
+                volume = data['items'][0]['volumeInfo']
+                if 'imageLinks' in volume:
+                    cover_url = volume['imageLinks'].get('thumbnail')
+                    if cover_url:
+                        with urllib.request.urlopen(cover_url, timeout=3) as img_response:
+                            img_data = img_response.read()
+                            img = Image.open(io.BytesIO(img_data)).convert("RGBA")
+                            return img
+    except Exception as e:
+        print(f"Не удалось загрузить обложку: {e}")
+    
+    return None
