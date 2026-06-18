@@ -110,31 +110,8 @@ def load_portrait(hero):
             return None
     return None
 
-def load_cover(book_name):
-    """Загружает обложку книги через Google Books API"""
-    try:
-        import urllib.parse
-        encoded_name = urllib.parse.quote(book_name)
-        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{encoded_name}&maxResults=1"
-        
-        with urllib.request.urlopen(url, timeout=3) as response:
-            data = json.loads(response.read().decode())
-            if 'items' in data and len(data['items']) > 0:
-                volume = data['items'][0]['volumeInfo']
-                if 'imageLinks' in volume:
-                    cover_url = volume['imageLinks'].get('thumbnail')
-                    if cover_url:
-                        with urllib.request.urlopen(cover_url, timeout=3) as img_response:
-                            img_data = img_response.read()
-                            img = Image.open(io.BytesIO(img_data)).convert("RGBA")
-                            return img
-    except Exception as e:
-        print(f"Не удалось загрузить обложку: {e}")
-    
-    return None
-
 def create_hero_card(hero):
-    """Создаёт карточку героя с обложкой и портретом для легендарных"""
+    """Создаёт карточку героя"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
@@ -200,6 +177,8 @@ def create_hero_card(hero):
     font_footer = load_font(18, "italic")
     font_quote = load_font(16, "italic")
     font_years = load_font(18, "italic")
+    font_book = load_font(24, "regular")
+    font_author_style = load_font(22, "italic")
 
     # РАМКА
     border = 8
@@ -212,7 +191,7 @@ def create_hero_card(hero):
     # РАЗДЕЛИТЕЛЬ
     y = 55
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
-    y += 25
+    y += 30
 
     # ПОРТРЕТ (только для легендарных)
     portrait = None
@@ -228,29 +207,21 @@ def create_hero_card(hero):
             y_portrait = 70
             img.paste(portrait, (x, y_portrait), portrait)
             draw.ellipse([(x-5, y_portrait-5), (x+185, y_portrait+185)], outline=pal["border"], width=4)
-            cover_offset = 160
-            name_offset = 70
+            name_y = 290
         else:
-            cover_offset = 0
-            name_offset = 0
+            name_y = height // 2 - 50
     else:
-        cover_offset = 0
-        name_offset = 0
-
-    # ОБЛОЖКА КНИГИ (только для НЕ легендарных)
-    if not is_legendary:
+        # Для не-легендарных обложка
         cover_img = load_cover(hero["book"])
         if cover_img:
             cover_img = cover_img.resize((130, 190), Image.Resampling.LANCZOS)
             x = (width - 130) // 2
-            y_cover = 90 + cover_offset
+            y_cover = 90
             img.paste(cover_img, (x, y_cover), cover_img)
             draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
             name_y = 310
         else:
             name_y = height // 2 - 50
-    else:
-        name_y = 270
 
     # ИМЯ ГЕРОЯ
     name = hero["name"]
@@ -261,18 +232,17 @@ def create_hero_card(hero):
     # РАЗДЕЛИТЕЛЬ
     y = name_y + 50
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
-    y += 30
+    y += 35
 
     # ДЛЯ ЛЕГЕНДАРНЫХ: годы жизни и цитата
     if is_legendary and portrait:
         # Годы жизни
         years = get_years(hero.get("author", ""))
         draw.text((width//2, y), years, fill=pal["sub"], font=font_years, anchor="mt")
-        y += 30
+        y += 32
         
         # Цитата
         quote = get_random_quote(hero.get("author", ""))
-        # Разбиваем цитату на строки по 35 символов
         words = quote.split()
         lines = []
         current_line = ""
@@ -285,27 +255,22 @@ def create_hero_card(hero):
         if current_line:
             lines.append(current_line.strip())
         
-        # Рамка для цитаты
-        quote_box_y = y - 5
-        quote_height = len(lines) * 22 + 20
-        draw.rectangle([(30, quote_box_y), (width - 30, quote_box_y + quote_height)], outline=pal["border"], width=1, fill=(0, 0, 0, 50))
-        
         for i, line in enumerate(lines):
             draw.text((width//2, y + i * 22), f'"{line}"', fill=pal["sub"], font=font_quote, anchor="mt")
         
-        y += len(lines) * 22 + 30
+        y += len(lines) * 22 + 35
         footer_y = height - 22
     else:
         # ДЛЯ НЕ ЛЕГЕНДАРНЫХ: книга и автор
         book = hero["book"]
-        draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=load_font(24, "regular"), anchor="mt")
-        y += 28
-        author = hero["author"]
-        draw.text((width//2, y), author, fill=pal["sub"], font=load_font(22, "italic"), anchor="mt")
+        draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
         y += 30
+        author = hero["author"]
+        draw.text((width//2, y), author, fill=pal["sub"], font=font_author_style, anchor="mt")
+        y += 35
         footer_y = height - 22
 
-    # РЕДКОСТЬ (общая для всех)
+    # РЕДКОСТЬ
     rare_labels = {
         "легендарный": "ЛЕГЕНДАРНЫЙ",
         "эпический": "ЭПИЧЕСКИЙ",
