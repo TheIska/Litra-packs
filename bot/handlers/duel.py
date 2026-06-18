@@ -43,7 +43,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_message("Соперник уже в игре.")
         return
 
-    # Берём 3 случайных героя
     hero_keys = list(collection.keys())
     if len(hero_keys) < 3:
         await send_message("❌ У тебя меньше 3 героев. Открой паки!")
@@ -76,7 +75,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_duel[user_id] = duel_id
     user_duel[opponent_id] = duel_id
 
-    # Отправляем сообщение о начале дуэли
     await send_message(
         f"⚔️ *Дуэль началась!*\n"
         f"Твои герои: {', '.join([collection[k]['name'] for k in p1_chosen])}\n"
@@ -114,7 +112,6 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     for idx, option in enumerate(question["options"]):
         keyboard.append([InlineKeyboardButton(option, callback_data=f"ans_{duel_id}_{current_player}_{idx}")])
 
-    # Бонусы от героев
     hero_keys = duel["p1_chosen"] if current_player == duel["player1"] else duel["p2_chosen"]
     used = duel.get(f"{player_key}_used", [])
     coll = get_collection(current_player)
@@ -125,15 +122,16 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
             rarity = hero.get("rarity", "обычный")
             bonus = BONUSES.get(rarity, BONUSES["обычный"])
             if bonus["code"] not in used:
+                # Используем другой разделитель для бонусов, чтобы избежать конфликта с _
                 bonus_buttons.append(InlineKeyboardButton(
                     f"💡 {bonus['name']} ({hero['name']})",
-                    callback_data=f"bon_{duel_id}_{current_player}_{bonus['code']}"
+                    callback_data=f"bon|{duel_id}|{current_player}|{bonus['code']}"
                 ))
 
     if bonus_buttons:
         keyboard.append(bonus_buttons)
 
-    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"sur_{duel_id}_{current_player}")])
+    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"sur|{duel_id}|{current_player}")])
 
     await context.bot.send_message(
         current_player,
@@ -151,11 +149,13 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data.split("_")
-    action = data[0]
+    data = query.data
+    parts = data.split("|")
+    action = parts[0]
 
     if action == "ans":
-        _, duel_id, player_id, answer_idx = data
+        # ans_duel_id_player_id_answer_idx
+        _, duel_id, player_id, answer_idx = parts
         player_id = int(player_id)
         answer_idx = int(answer_idx)
         duel = duels.get(duel_id)
@@ -191,7 +191,8 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await ask_question(update, context, duel_id)
 
     elif action == "bon":
-        _, duel_id, player_id, bonus_code = data
+        # bon|duel_id|player_id|bonus_code
+        _, duel_id, player_id, bonus_code = parts
         player_id = int(player_id)
         duel = duels.get(duel_id)
         if not duel:
@@ -229,7 +230,8 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"🔍 Бонус активирован!")
 
     elif action == "sur":
-        _, duel_id, player_id = data
+        # sur|duel_id|player_id
+        _, duel_id, player_id = parts
         player_id = int(player_id)
         duel = duels.get(duel_id)
         if not duel:
