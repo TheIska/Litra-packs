@@ -87,7 +87,6 @@ async def show_card_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.send_message(user_id, "❌ У тебя нет героев для дуэли.")
         return
 
-    # Показываем всех героев (до 20)
     items = list(collection.items())[:20]
     keyboard = []
     duel = duels.get(duel_id)
@@ -142,7 +141,6 @@ async def card_selection_callback(update: Update, context: ContextTypes.DEFAULT_
             selected.append(hero_key)
             action = "добавил"
 
-        # Обновляем клавиатуру
         await show_card_selection(update, context, user_id, duel_id)
         await query.answer(f"Ты {action} героя! Осталось выбрать {3 - len(selected)}.")
 
@@ -248,6 +246,9 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     if bonus_buttons:
         keyboard.append(bonus_buttons)
 
+    # Кнопка "Сдаться"
+    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"duel_surrender_{duel_id}_{current_player}")])
+
     await context.bot.send_message(
         current_player,
         text,
@@ -258,8 +259,60 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     opponent = duel["player2"] if current_player == duel["player1"] else duel["player1"]
     await context.bot.send_message(
         opponent,
-        f"⏳ Сейчас ход твоего соперника. Вопрос {q_index+1}."
+        f"⏳ Сейчас ход твоего соперника. Вопрос {q_index+1}. Он может сдаться в любой момент."
     )
+
+async def surrender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки 'Сдаться'"""
+    query = update.callback_query
+    await query.answer()
+    data = query.data.split("_")
+    if data[1] == "surrender":
+        _, _, duel_id, player_id = data
+        player_id = int(player_id)
+        duel = duels.get(duel_id)
+        if not duel:
+            await query.edit_message_text("❌ Дуэль уже завершена.")
+            return
+        if duel["status"] != "active":
+            await query.edit_message_text("❌ Дуэль уже завершена.")
+            return
+        if duel["current_player"] != player_id:
+            await query.edit_message_text("⏳ Сейчас не твой ход, ты не можешь сдаться.")
+            return
+
+        # Определяем победителя (соперник)
+        if player_id == duel["player1"]:
+            winner = duel["player2"]
+            loser = duel["player1"]
+        else:
+            winner = duel["player1"]
+            loser = duel["player2"]
+
+        # Обновляем статистику
+        update_duel_stats(winner, True)
+        update_duel_stats(loser, False)
+
+        # Отправляем сообщения
+        await context.bot.send_message(
+            winner,
+            f"🏆 *Ты победил!* Соперник сдался.\nИтоговый счёт: {duel['p1_score']}:{duel['p2_score']}",
+            parse_mode="Markdown"
+        )
+        await context.bot.send_message(
+            loser,
+            f"😔 *Ты проиграл, сдавшись.*\nИтоговый счёт: {duel['p1_score']}:{duel['p2_score']}",
+            parse_mode="Markdown"
+        )
+
+        # Удаляем дуэль
+        if duel["player1"] in user_duel:
+            del user_duel[duel["player1"]]
+        if duel["player2"] in user_duel:
+            del user_duel[duel["player2"]]
+        duels.pop(duel_id, None)
+
+        await query.edit_message_text("🏳️ *Ты сдался. Дуэль завершена.*", parse_mode="Markdown")
 
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

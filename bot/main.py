@@ -8,7 +8,8 @@ from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
     card_selection_callback,
-    answer_callback
+    answer_callback,
+    surrender_callback  # <-- импорт
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -51,6 +52,7 @@ def main():
     app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^duel_reset_"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^duel_answer_"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^duel_bonus_"))
+    app.add_handler(CallbackQueryHandler(surrender_callback, pattern="^duel_surrender_"))  # <-- добавлено
 
     # ========== ЗАПУСК ==========
     print("🤖 Бот запущен!")
