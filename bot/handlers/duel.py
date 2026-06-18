@@ -65,11 +65,13 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p2_score": 0,
         "p1_used": [],
         "p2_used": [],
-        "questions": random.sample(QUESTIONS, 5),  # 5 вопросов
+        "questions": random.sample(QUESTIONS, 5),
         "turn": 0,
         "current_player": user_id,
         "p1_chosen": p1_chosen,
         "p2_chosen": p2_chosen,
+        "p1_answered": False,
+        "p2_answered": False,
     }
 
     user_duel[user_id] = duel_id
@@ -155,7 +157,6 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = parts[0]
 
     if action == "a":
-        # a|duel_id|player_id|answer_idx
         duel_id = parts[1]
         player_id = int(parts[2])
         answer_idx = int(parts[3])
@@ -173,7 +174,6 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_key = "p1" if player_id == duel["player1"] else "p2"
         opponent_key = "p2" if player_id == duel["player1"] else "p1"
         
-        # Проверяем, не ответил ли уже этот игрок
         if duel.get(f"{player_key}_answered", False):
             await query.edit_message_text("⏳ Ты уже ответил на этот вопрос!")
             return
@@ -182,51 +182,37 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         correct = question["correct"]
         is_correct = (answer_idx == correct)
         
-        # Отмечаем, что игрок ответил
         duel[f"{player_key}_answered"] = True
         
         if is_correct:
             duel[f"{player_key}_score"] += 1
             await query.edit_message_text(f"✅ *Правильно!* +1 очко!", parse_mode="Markdown")
-            # Уведомляем соперника
-            await context.bot.send_message(
-                duel[opponent_key if player_key == "p1" else "p1"],
-                f"❌ Соперник ответил правильно! Ты не получаешь очко."
-            )
         else:
             await query.edit_message_text("❌ *Неправильно.*", parse_mode="Markdown")
-            # Уведомляем соперника
-            await context.bot.send_message(
-                duel[opponent_key if player_key == "p1" else "p1"],
-                f"✅ Соперник ответил неправильно! Ты не получаешь очко, но это твой шанс."
-            )
-            # Даём второму игроку возможность ответить на тот же вопрос
-            await context.bot.send_message(
-                duel[opponent_key if player_key == "p1" else "p1"],
-                f"❓ *Вопрос {q_index+1} из 5*\n\n{question['text']}",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton(option, callback_data=f"a|{duel_id}|{duel[opponent_key if player_key == 'p1' else 'p1']}|{idx}")]
-                    for idx, option in enumerate(question["options"])
-                ])
-            )
-            # Помечаем, что второй игрок ещё не ответил
-            duel[f"{opponent_key}_answered"] = False
-            return
         
-        # Переход к следующему вопросу
-        await asyncio.sleep(0.5)
-        duel["turn"] += 1
-        if duel["current_player"] == duel["player1"]:
-            duel["current_player"] = duel["player2"]
+        # Проверяем, ответили ли оба игрока
+        if duel.get("p1_answered", False) and duel.get("p2_answered", False):
+            # Оба ответили — переходим к следующему вопросу
+            await asyncio.sleep(0.5)
+            duel["turn"] += 1
+            duel["p1_answered"] = False
+            duel["p2_answered"] = False
+            # Переключаем ход на следующего игрока
+            if duel["current_player"] == duel["player1"]:
+                duel["current_player"] = duel["player2"]
+            else:
+                duel["current_player"] = duel["player1"]
+            await ask_question(update, context, duel_id)
         else:
-            duel["current_player"] = duel["player1"]
-        duel["p1_answered"] = False
-        duel["p2_answered"] = False
-        await ask_question(update, context, duel_id)
+            # Не все ответили — даём ход другому игроку
+            await asyncio.sleep(0.5)
+            if duel["current_player"] == duel["player1"]:
+                duel["current_player"] = duel["player2"]
+            else:
+                duel["current_player"] = duel["player1"]
+            await ask_question(update, context, duel_id)
 
     elif action == "b":
-        # b|duel_id|player_id|bonus_code
         duel_id = parts[1]
         player_id = int(parts[2])
         bonus_code = parts[3]
@@ -256,27 +242,27 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if q_index < len(duel["questions"]):
                 player_key = "p1" if player_id == duel["player1"] else "p2"
                 opponent_key = "p2" if player_id == duel["player1"] else "p1"
-                duel[f"{player_key}_score"] += 1
-                duel[f"{player_key}_answered"] = True
-                await query.edit_message_text("⭐ «Автопобеда»! Вопрос засчитан как правильный!")
-                await context.bot.send_message(
-                    duel[opponent_key if player_key == "p1" else "p1"],
-                    f"❌ Соперник использовал «Автопобеду»! Ты не получаешь очко."
-                )
-                await asyncio.sleep(0.5)
-                duel["turn"] += 1
-                if duel["current_player"] == duel["player1"]:
-                    duel["current_player"] = duel["player2"]
-                else:
-                    duel["current_player"] = duel["player1"]
-                duel["p1_answered"] = False
-                duel["p2_answered"] = False
-                await ask_question(update, context, duel_id)
+                if not duel.get("correct_answered", False) and not duel.get(f"{player_key}_answered", False):
+                    duel[f"{player_key}_score"] += 1
+                    duel[f"{player_key}_answered"] = True
+                    await query.edit_message_text("⭐ «Автопобеда»! Вопрос засчитан как правильный!")
+                    await context.bot.send_message(
+                        duel[opponent_key if player_key == "p1" else "p1"],
+                        f"❌ Соперник использовал «Автопобеду»! Ты не получаешь очко."
+                    )
+                    await asyncio.sleep(0.5)
+                    duel["turn"] += 1
+                    duel["p1_answered"] = False
+                    duel["p2_answered"] = False
+                    if duel["current_player"] == duel["player1"]:
+                        duel["current_player"] = duel["player2"]
+                    else:
+                        duel["current_player"] = duel["player1"]
+                    await ask_question(update, context, duel_id)
         else:
             await query.edit_message_text(f"🔍 Бонус активирован!")
 
     elif action == "s":
-        # s|duel_id|player_id
         duel_id = parts[1]
         player_id = int(parts[2])
             
