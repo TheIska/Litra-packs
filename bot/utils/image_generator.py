@@ -8,50 +8,53 @@ from PIL import Image, ImageDraw, ImageFont
 COVERS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'covers')
 FONTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
 
-# Прямая ссылка на шрифт Playfair Display (Google Fonts)
+# Прямая ссылка на шрифт
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Regular.ttf"
+
+# Кэш для шрифта и обложек
+_font_cache = None
+_cover_cache = {}
 
 def download_font():
     """Скачивает шрифт из интернета, если его нет локально"""
+    global _font_cache
     try:
         os.makedirs(FONTS_DIR, exist_ok=True)
         font_path = os.path.join(FONTS_DIR, "regular.ttf")
         if not os.path.exists(font_path):
-            print(f"⬇️ Скачиваю шрифт с {FONT_URL}")
             urllib.request.urlretrieve(FONT_URL, font_path)
-            print(f"✅ Шрифт сохранён: {font_path}")
         return font_path
-    except Exception as e:
-        print(f"❌ Не удалось скачать шрифт: {e}")
+    except:
         return None
 
 def load_font(size):
-    """Загружает шрифт: сначала ищет локально, потом скачивает из интернета"""
-    # Пробуем загрузить уже скачанный шрифт
-    font_path = os.path.join(FONTS_DIR, "regular.ttf")
-    if os.path.exists(font_path):
-        try:
-            print(f"✅ Загружаю локальный шрифт: {font_path}")
-            return ImageFont.truetype(font_path, size)
-        except Exception as e:
-            print(f"⚠️ Ошибка загрузки локального шрифта: {e}")
+    """Загружает шрифт (с кэшированием)"""
+    global _font_cache
+    if _font_cache is not None:
+        return _font_cache
     
-    # Если локального нет — скачиваем
-    font_path = download_font()
+    font_path = os.path.join(FONTS_DIR, "regular.ttf")
+    if not os.path.exists(font_path):
+        font_path = download_font()
+    
     if font_path and os.path.exists(font_path):
         try:
-            print(f"✅ Загружаю скачанный шрифт: {font_path}")
-            return ImageFont.truetype(font_path, size)
-        except Exception as e:
-            print(f"⚠️ Ошибка загрузки скачанного шрифта: {e}")
+            _font_cache = ImageFont.truetype(font_path, size)
+            return _font_cache
+        except:
+            pass
     
-    # Если ничего не помогло — используем стандартный
-    print("⚠️ Использую стандартный шрифт")
-    return ImageFont.load_default()
+    _font_cache = ImageFont.load_default()
+    return _font_cache
 
 def load_cover(book_name):
-    """Загружает обложку книги: сначала локально, потом из интернета"""
+    """Загружает обложку книги (с кэшированием)"""
+    global _cover_cache
     clean_name = book_name.replace('"', '').replace('«', '').replace('»', '').replace('?', '').replace('!', '')
+    
+    # Проверяем кэш
+    if clean_name in _cover_cache:
+        return _cover_cache[clean_name]
     
     # Локально
     extensions = ['.jpg', '.jpeg', '.png', '.webp']
@@ -59,21 +62,23 @@ def load_cover(book_name):
         path = os.path.join(COVERS_DIR, f"{clean_name}{ext}")
         if os.path.exists(path):
             try:
-                return Image.open(path).convert("RGBA")
+                img = Image.open(path).convert("RGBA")
+                _cover_cache[clean_name] = img
+                return img
             except:
                 pass
     
-    # Через Google Books
+    # Через Google Books (с таймаутом 3 секунды)
     try:
         url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{urllib.parse.quote(book_name)}&maxResults=1"
-        with urllib.request.urlopen(url, timeout=5) as response:
+        with urllib.request.urlopen(url, timeout=3) as response:
             data = json.loads(response.read().decode())
             if 'items' in data and len(data['items']) > 0:
                 volume = data['items'][0]['volumeInfo']
                 if 'imageLinks' in volume:
                     cover_url = volume['imageLinks'].get('thumbnail')
                     if cover_url:
-                        with urllib.request.urlopen(cover_url, timeout=5) as img_response:
+                        with urllib.request.urlopen(cover_url, timeout=3) as img_response:
                             img_data = img_response.read()
                             img = Image.open(io.BytesIO(img_data)).convert("RGBA")
                             try:
@@ -82,50 +87,23 @@ def load_cover(book_name):
                                 img.save(local_path, 'JPEG')
                             except:
                                 pass
+                            _cover_cache[clean_name] = img
                             return img
-    except Exception as e:
-        print(f"Не удалось загрузить обложку для {book_name}: {e}")
+    except:
+        pass
     
+    _cover_cache[clean_name] = None
     return None
 
 def create_hero_card(hero):
-    width, height = 500, 700
+    width, height = 400, 560  # Уменьшенный размер для скорости
     rarity = hero.get("rarity", "обычный")
 
-    # Цвета для разных редкостей
     colors = {
-        "легендарный": {
-            "bg": (45, 35, 25),
-            "border": (255, 215, 0),
-            "accent": (255, 215, 0),
-            "text": (255, 235, 200),
-            "rarity_color": (255, 215, 0),
-            "subtext": (200, 180, 150)
-        },
-        "эпический": {
-            "bg": (35, 25, 45),
-            "border": (155, 89, 182),
-            "accent": (155, 89, 182),
-            "text": (255, 235, 200),
-            "rarity_color": (155, 89, 182),
-            "subtext": (200, 180, 150)
-        },
-        "редкий": {
-            "bg": (25, 35, 45),
-            "border": (52, 152, 219),
-            "accent": (52, 152, 219),
-            "text": (255, 235, 200),
-            "rarity_color": (52, 152, 219),
-            "subtext": (200, 180, 150)
-        },
-        "обычный": {
-            "bg": (35, 35, 35),
-            "border": (149, 165, 166),
-            "accent": (149, 165, 166),
-            "text": (220, 210, 190),
-            "rarity_color": (149, 165, 166),
-            "subtext": (180, 170, 150)
-        }
+        "легендарный": {"bg": (45, 35, 25), "border": (255, 215, 0), "accent": (255, 215, 0), "text": (255, 235, 200), "rarity_color": (255, 215, 0), "subtext": (200, 180, 150)},
+        "эпический": {"bg": (35, 25, 45), "border": (155, 89, 182), "accent": (155, 89, 182), "text": (255, 235, 200), "rarity_color": (155, 89, 182), "subtext": (200, 180, 150)},
+        "редкий": {"bg": (25, 35, 45), "border": (52, 152, 219), "accent": (52, 152, 219), "text": (255, 235, 200), "rarity_color": (52, 152, 219), "subtext": (200, 180, 150)},
+        "обычный": {"bg": (35, 35, 35), "border": (149, 165, 166), "accent": (149, 165, 166), "text": (220, 210, 190), "rarity_color": (149, 165, 166), "subtext": (180, 170, 150)}
     }
 
     pal = colors.get(rarity, colors["обычный"])
@@ -133,72 +111,52 @@ def create_hero_card(hero):
     img = Image.new('RGB', (width, height), color=pal["bg"])
     draw = ImageDraw.Draw(img)
 
-    # Текстура
-    for i in range(0, height, 3):
-        for j in range(0, width, 3):
-            noise = random.randint(-8, 8)
-            r = max(0, min(255, pal["bg"][0] + noise))
-            g = max(0, min(255, pal["bg"][1] + noise))
-            b = max(0, min(255, pal["bg"][2] + noise))
-            draw.point((j, i), fill=(r, g, b))
-
-    # Загружаем шрифт
-    font = load_font(28)
+    # Упрощённая текстура (без циклов)
+    font = load_font(24)
 
     # Рамка
-    border_width = 8
-    draw.rectangle(
-        [(border_width, border_width), (width - border_width, height - border_width)],
-        outline=pal["border"],
-        width=3
-    )
+    border_width = 6
+    draw.rectangle([(border_width, border_width), (width - border_width, height - border_width)], outline=pal["border"], width=3)
 
     # Заголовок
-    draw.text((width//2, 15), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font, anchor="mt")
+    draw.text((width//2, 12), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font, anchor="mt")
 
-    # Обложка
+    # Обложка (уменьшенная)
     cover_img = load_cover(hero["book"])
     if cover_img:
-        cover_img = cover_img.resize((180, 250), Image.Resampling.LANCZOS)
-        x = (width - 180) // 2
-        y = 55
+        cover_img = cover_img.resize((140, 190), Image.Resampling.LANCZOS)
+        x = (width - 140) // 2
+        y = 45
         img.paste(cover_img, (x, y), cover_img)
-        draw.rectangle([(x-3, y-3), (x+183, y+253)], outline=pal["border"], width=2)
+        draw.rectangle([(x-3, y-3), (x+143, y+193)], outline=pal["border"], width=2)
+        y_offset = 260
     else:
-        draw.text((width//2, 150), "📚", fill=pal["border"], font=font, anchor="mt")
+        draw.text((width//2, 120), "📚", fill=pal["border"], font=font, anchor="mt")
+        y_offset = 230
 
     # Имя
-    y_offset = 340
-    draw.text((width//2 + 2, y_offset + 2), hero["name"], fill=(0,0,0), font=font, anchor="mt")
+    draw.text((width//2 + 1, y_offset + 1), hero["name"], fill=(0,0,0), font=font, anchor="mt")
     draw.text((width//2, y_offset), hero["name"], fill=pal["text"], font=font, anchor="mt")
 
-    # Разделитель
-    y_offset += 50
-    draw.line([(60, y_offset), (width - 60, y_offset)], fill=pal["accent"], width=2)
-    y_offset += 30
+    y_offset += 40
+    draw.line([(40, y_offset), (width - 40, y_offset)], fill=pal["accent"], width=1)
+    y_offset += 25
 
     # Книга
     draw.text((width//2, y_offset), hero["book"], fill=pal["subtext"], font=font, anchor="mt")
-    y_offset += 30
+    y_offset += 25
 
     # Автор
     draw.text((width//2, y_offset), hero["author"], fill=pal["subtext"], font=font, anchor="mt")
-    y_offset += 45
+    y_offset += 35
 
     # Редкость
-    rarity_labels = {
-        "легендарный": "ЛЕГЕНДАРНЫЙ",
-        "эпический": "ЭПИЧЕСКИЙ",
-        "редкий": "РЕДКИЙ",
-        "обычный": "ОБЫЧНЫЙ"
-    }
-    rarity_text = rarity_labels.get(rarity, "ОБЫЧНЫЙ")
-    draw.text((width//2, y_offset), rarity_text, fill=pal["rarity_color"], font=font, anchor="mt")
+    rarity_labels = {"легендарный": "ЛЕГЕНДАРНЫЙ", "эпический": "ЭПИЧЕСКИЙ", "редкий": "РЕДКИЙ", "обычный": "ОБЫЧНЫЙ"}
+    draw.text((width//2, y_offset), rarity_labels.get(rarity, "ОБЫЧНЫЙ"), fill=pal["rarity_color"], font=font, anchor="mt")
 
-    # Нижний колонтитул
-    draw.text((width//2, height - 20), "Создано с любовью к литературе", fill=(80, 75, 65), font=font, anchor="mt")
+    draw.text((width//2, height - 15), "С любовью к литературе", fill=(80, 75, 65), font=font, anchor="mt")
 
     bio = io.BytesIO()
-    img.save(bio, format='PNG')
+    img.save(bio, format='JPEG', quality=85, optimize=True)
     bio.seek(0)
     return bio
