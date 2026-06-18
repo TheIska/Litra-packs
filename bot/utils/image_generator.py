@@ -28,8 +28,18 @@ def load_font(size, style="regular"):
     except:
         return ImageFont.load_default()
 
+def load_logo():
+    """Загружает логотип из папки static/images/"""
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo.png')
+        if os.path.exists(logo_path):
+            return Image.open(logo_path).convert("RGBA")
+        return None
+    except:
+        return None
+
 def create_hero_card(hero):
-    """Создаёт карточку героя без декоративных символов"""
+    """Создаёт карточку героя с логотипом"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
@@ -87,27 +97,35 @@ def create_hero_card(hero):
         draw.line([(0, i), (width, i)], fill=(r, g, b))
 
     # Шрифты
-    font_title = load_font(24, "italic")
+    font_title = load_font(28, "bold")      # Жирный для LITRA PACKS
     font_name = load_font(44, "bold")
     font_book = load_font(24, "regular")
     font_author = load_font(22, "italic")
     font_rare = load_font(28, "bold")
     font_footer = load_font(18, "italic")
 
-    # 1. РАМКА (двойная)
+    # 1. РАМКА
     border = 8
     draw.rectangle([(border, border), (width - border, height - border)], outline=pal["border"], width=3)
     draw.rectangle([(border + 12, border + 12), (width - border - 12, height - border - 12)], outline=pal["border"], width=1)
 
-    # 2. ВЕРХНИЙ ЗАГОЛОВОК
-    draw.text((width//2, 18), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
+    # 2. ЛОГОТИП (в левом верхнем углу)
+    logo = load_logo()
+    if logo:
+        # Масштабируем логотип до 60x60
+        logo = logo.resize((60, 60), Image.Resampling.LANCZOS)
+        # Вставляем в левый верхний угол (отступ 20px)
+        img.paste(logo, (20, 15), logo)
+    
+    # 3. ЗАГОЛОВОК "LITRA PACKS"
+    draw.text((width//2, 22), "LITRA PACKS", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # 3. РАЗДЕЛИТЕЛЬ (только линия)
-    y = 50
+    # 4. РАЗДЕЛИТЕЛЬ
+    y = 55
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
     y += 25
 
-    # 4. ИМЯ ГЕРОЯ — ЦЕНТР
+    # 5. ИМЯ ГЕРОЯ — ЦЕНТР
     name = hero["name"]
     name_y = height // 2 - 50
     
@@ -116,22 +134,22 @@ def create_hero_card(hero):
     
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
-    # 5. РАЗДЕЛИТЕЛЬ (только линия)
+    # 6. РАЗДЕЛИТЕЛЬ
     y = height // 2 + 40
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
     y += 40
 
-    # 6. КНИГА
+    # 7. КНИГА
     book = hero["book"]
     draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
     y += 32
 
-    # 7. АВТОР
+    # 8. АВТОР
     author = hero["author"]
     draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
     y += 50
 
-    # 8. РЕДКОСТЬ
+    # 9. РЕДКОСТЬ
     rare_labels = {
         "легендарный": "ЛЕГЕНДАРНЫЙ",
         "эпический": "ЭПИЧЕСКИЙ",
@@ -141,7 +159,7 @@ def create_hero_card(hero):
     rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
 
-    # 9. НИЖНИЙ КОЛОНТИТУЛ
+    # 10. НИЖНИЙ КОЛОНТИТУЛ
     draw.text((width//2, height - 22), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
 
     # Сохраняем
