@@ -7,7 +7,7 @@ from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
-    card_selection_callback,
+    selection_callback,
     answer_callback
 )
 from .handlers.admin import add_coins_command
@@ -44,14 +44,15 @@ def main():
     # Коллекция
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
 
-    # Дуэли (короткие паттерны)
+    # Дуэли
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dc_"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dr_"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dreset_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^da_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^db_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ds_"))
+    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^sel_"))
+    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^nav_"))
+    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^rdy_"))
+    app.add_handler(CallbackQueryHandler(selection_callback, pattern="^rst_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^bon_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^sur_"))
 
     print("🤖 Бот запущен!")
     app.run_polling()
