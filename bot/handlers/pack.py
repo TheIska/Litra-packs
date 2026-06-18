@@ -1,6 +1,7 @@
 import random
+import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
 from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
 from ..models.hero import HEROES
@@ -52,8 +53,12 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     if query:
         await query.answer()
         user_id = query.from_user.id
+        chat_id = query.message.chat_id
+        message_id = query.message.message_id
     else:
         user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        message_id = None
 
     user = get_user(user_id)
 
@@ -110,16 +115,16 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
         [InlineKeyboardButton("🎁 Открыть другой пак", callback_data="shop")],
     ]
 
-    # Отправляем карточку (без анимации)
     if query:
-        # Удаляем исходное сообщение с кнопками, чтобы не оставалось старых
+        # Пытаемся удалить старое сообщение, но не падаем, если его нет
         try:
             await query.message.delete()
         except Exception:
-            pass
-        # Отправляем новое сообщение с карточкой
+            pass  # Игнорируем ошибку, если сообщение уже удалено
+        
+        # Отправляем карточку
         await context.bot.send_photo(
-            chat_id=query.message.chat_id,
+            chat_id=chat_id,
             photo=image_bytes,
             caption=caption,
             parse_mode="Markdown",
