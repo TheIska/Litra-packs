@@ -15,8 +15,8 @@ BONUSES = {
     "легендарный": {"name": "Автопобеда", "code": "bonus_4"},
 }
 
-# Порядок редкости
 RARITY_ORDER = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
+HEROES_PER_PAGE = 5
 
 async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -72,7 +72,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p1_page": 0,
         "p2_page": 0,
         "p1_items": sorted_items,
-        "p2_items": sorted_items,  # для второго игрока обновим позже
+        "p2_items": [],  # заполним позже для соперника
     }
 
     user_duel[user_id] = duel_id
@@ -81,7 +81,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_message("⚔️ *Соперник найден!* Выбери 3 героя:", parse_mode="Markdown")
     await show_selection(update, context, user_id, duel_id)
 
-    # Отправляем сопернику
     try:
         # Сортируем героев соперника
         p2_collection = get_collection(opponent_id)
@@ -102,7 +101,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cancel_duel(duel_id)
         return
 
-async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, duel_id: str, is_opponent=False, page=0):
+async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, duel_id: str, is_opponent=False):
     collection = get_collection(user_id)
     if not collection:
         await context.bot.send_message(user_id, "❌ Нет героев.")
@@ -112,7 +111,6 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     if not duel:
         return
 
-    # Определяем данные для игрока
     if user_id == duel["player1"]:
         chosen = duel["p1_chosen"]
         page_key = "p1_page"
@@ -122,32 +120,27 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         page_key = "p2_page"
         items_key = "p2_items"
 
-    # Если items ещё не установлены (для второго игрока) — сортируем
-    if not duel.get(items_key):
-        sorted_items = sorted(
+    items = duel.get(items_key)
+    if not items:
+        items = sorted(
             collection.items(),
             key=lambda item: RARITY_ORDER.get(item[1].get("rarity", "обычный"), 999)
         )
-        duel[items_key] = sorted_items
+        duel[items_key] = items
 
-    items = duel[items_key]
     total_items = len(items)
-    
-    # Определяем текущую страницу
     current_page = duel.get(page_key, 0)
-    per_page = 5
-    total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
+    total_pages = (total_items + HEROES_PER_PAGE - 1) // HEROES_PER_PAGE if total_items > 0 else 1
     if current_page >= total_pages:
         current_page = total_pages - 1
     if current_page < 0:
         current_page = 0
     duel[page_key] = current_page
 
-    start_idx = current_page * per_page
-    end_idx = min(start_idx + per_page, total_items)
+    start_idx = current_page * HEROES_PER_PAGE
+    end_idx = min(start_idx + HEROES_PER_PAGE, total_items)
     page_items = items[start_idx:end_idx]
 
-    # Строим клавиатуру
     keyboard = []
     for key, hero in page_items:
         if key in chosen:
@@ -156,7 +149,7 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             btn_text = f"➕ {hero['name']} ({hero['rarity']})"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"sel_{duel_id}_{user_id}_{key}")])
 
-    # Кнопки навигации
+    # Навигация
     nav_buttons = []
     if current_page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"nav_{duel_id}_{user_id}_{current_page - 1}"))
@@ -165,14 +158,10 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     if nav_buttons:
         keyboard.append(nav_buttons)
 
-    # Кнопки действий
     keyboard.append([InlineKeyboardButton(f"✅ Готово ({len(chosen)}/3)", callback_data=f"rdy_{duel_id}_{user_id}")])
     keyboard.append([InlineKeyboardButton("🔄 Сбросить выбор", callback_data=f"rst_{duel_id}_{user_id}")])
 
-    # Информация о странице
-    page_info = f"Страница {current_page + 1} из {total_pages} | Выбрано: {len(chosen)}/3"
-    if total_items > 0:
-        page_info += f" | Показано: {start_idx + 1}-{end_idx} из {total_items}"
+    page_info = f"Страница {current_page + 1} из {total_pages} | Показано {len(page_items)} героев | Выбрано: {len(chosen)}/3"
 
     await context.bot.send_message(
         user_id,
@@ -208,15 +197,7 @@ async def selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return
             chosen.append(hero_key)
 
-        # Определяем текущую страницу и показываем её
-        if user_id == duel["player1"]:
-            page = duel.get("p1_page", 0)
-        else:
-            page = duel.get("p2_page", 0)
-        
-        # Удаляем старое сообщение и показываем обновлённое
-        await query.message.delete()
-        await show_selection(update, context, user_id, duel_id, page=page)
+        await show_selection(update, context, user_id, duel_id)
 
     elif action == "nav":
         _, duel_id, user_id, page = data
@@ -232,8 +213,7 @@ async def selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             duel["p2_page"] = page
 
-        await query.message.delete()
-        await show_selection(update, context, user_id, duel_id, page=page)
+        await show_selection(update, context, user_id, duel_id)
 
     elif action == "rdy":
         _, duel_id, user_id = data
@@ -274,7 +254,6 @@ async def selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             duel["p2_chosen"] = []
             duel["p2_ready"] = False
 
-        await query.message.delete()
         await show_selection(update, context, user_id, duel_id)
 
 async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_id: str):
@@ -310,7 +289,6 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     for idx, option in enumerate(question["options"]):
         keyboard.append([InlineKeyboardButton(option, callback_data=f"ans_{duel_id}_{current_player}_{idx}")])
 
-    # Бонусы от выбранных героев
     hero_keys = duel["p1_chosen"] if current_player == duel["player1"] else duel["p2_chosen"]
     used = duel.get(f"{player_key}_used", [])
     bonus_buttons = []
