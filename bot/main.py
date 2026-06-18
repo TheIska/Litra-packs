@@ -8,8 +8,7 @@ from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
     card_selection_callback,
-    answer_callback,
-    surrender_callback  # <-- импорт
+    answer_callback
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -25,36 +24,35 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ========== КОМАНДЫ ==========
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
     app.add_handler(CommandHandler("addcoins", add_coins_command))
 
-    # ========== CALLBACK'И ГЛАВНОГО МЕНЮ ==========
+    # Меню
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
     app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
 
-    # ========== ПАКИ ==========
+    # Паки
     app.add_handler(CallbackQueryHandler(free_pack, pattern="^free_pack$"))
     app.add_handler(CallbackQueryHandler(small_pack, pattern="^small_pack$"))
     app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
-    # ========== КОЛЛЕКЦИЯ ==========
+    # Коллекция
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
 
-    # ========== ДУЭЛИ ==========
+    # Дуэли (короткие паттерны)
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^duel_card_"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^duel_ready_"))
-    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^duel_reset_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^duel_answer_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^duel_bonus_"))
-    app.add_handler(CallbackQueryHandler(surrender_callback, pattern="^duel_surrender_"))  # <-- добавлено
+    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dc_"))
+    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dr_"))
+    app.add_handler(CallbackQueryHandler(card_selection_callback, pattern="^dreset_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^da_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^db_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ds_"))
 
-    # ========== ЗАПУСК ==========
     print("🤖 Бот запущен!")
     app.run_polling()
 
