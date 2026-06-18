@@ -19,7 +19,6 @@ def load_font(size, style="regular"):
         if os.path.exists(font_path):
             return ImageFont.truetype(font_path, size)
         
-        # Если нет нужного — ищем любой .ttf
         if os.path.exists(font_dir):
             for f in os.listdir(font_dir):
                 if f.endswith('.ttf') or f.endswith('.otf'):
@@ -80,7 +79,6 @@ def create_hero_card(hero):
     img = Image.new('RGB', (width, height), color=pal["bg"])
     draw = ImageDraw.Draw(img)
     
-    # Простой вертикальный градиент
     for i in range(height):
         ratio = i / height
         r = int(pal["bg"][0] * (1 - ratio) + pal["bg2"][0] * ratio)
@@ -90,7 +88,7 @@ def create_hero_card(hero):
 
     # Шрифты
     font_title = load_font(24, "italic")
-    font_name = load_font(44, "bold")      # Крупный, древнерусский
+    font_name = load_font(44, "bold")
     font_book = load_font(24, "regular")
     font_author = load_font(22, "italic")
     font_rare = load_font(28, "bold")
@@ -109,35 +107,33 @@ def create_hero_card(hero):
     y = 50
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
     y += 10
-    draw.text((width//2, y), "❧", fill=pal["border"], font=font_deco, anchor="mt")
+    draw.text((width//2, y), "~", fill=pal["border"], font=font_deco, anchor="mt")
     y += 15
 
     # 4. ИМЯ ГЕРОЯ — ЦЕНТР
     name = hero["name"]
     name_y = height // 2 - 50
     
-    # Тень (смещение для объёма)
     for dx, dy in [(-3,-3), (-3,3), (3,-3), (3,3)]:
         draw.text((width//2 + dx, name_y + dy), name, fill=(0, 0, 0), font=font_name, anchor="mt")
     
-    # Основной текст
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
     # 5. ДЕКОРАТИВНЫЙ УЗОР ВОКРУГ ИМЕНИ
     deco_y = name_y
-    draw.text((width//2 - 180, deco_y), "✦", fill=pal["accent"], font=font_deco, anchor="mt")
-    draw.text((width//2 + 180, deco_y), "✦", fill=pal["accent"], font=font_deco, anchor="mt")
+    draw.text((width//2 - 180, deco_y), "*", fill=pal["accent"], font=font_deco, anchor="mt")
+    draw.text((width//2 + 180, deco_y), "*", fill=pal["accent"], font=font_deco, anchor="mt")
     
     # 6. РАЗДЕЛИТЕЛЬ
     y = height // 2 + 40
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
     y += 15
-    draw.text((width//2, y), "❧", fill=pal["accent"], font=font_deco, anchor="mt")
+    draw.text((width//2, y), "~", fill=pal["accent"], font=font_deco, anchor="mt")
     y += 25
 
     # 7. КНИГА
     book = hero["book"]
-    draw.text((width//2, y), f"«{book}»", fill=pal["sub"], font=font_book, anchor="mt")
+    draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
     y += 32
 
     # 8. АВТОР
@@ -147,16 +143,16 @@ def create_hero_card(hero):
 
     # 9. РЕДКОСТЬ
     rare_labels = {
-        "легендарный": "✦ ЛЕГЕНДАРНЫЙ ✦",
-        "эпический": "✦ ЭПИЧЕСКИЙ ✦",
-        "редкий": "✦ РЕДКИЙ ✦",
-        "обычный": "✦ ОБЫЧНЫЙ ✦"
+        "легендарный": "ЛЕГЕНДАРНЫЙ",
+        "эпический": "ЭПИЧЕСКИЙ",
+        "редкий": "РЕДКИЙ",
+        "обычный": "ОБЫЧНЫЙ"
     }
-    rare_text = rare_labels.get(rarity, "✦ ОБЫЧНЫЙ ✦")
+    rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
 
     # 10. НИЖНИЙ КОЛОНТИТУЛ
-    draw.text((width//2, height - 22), "† С любовью к литературе †", fill=(80, 75, 65), font=font_footer, anchor="mt")
+    draw.text((width//2, height - 22), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
 
     # Сохраняем
     bio = io.BytesIO()
