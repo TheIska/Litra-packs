@@ -15,6 +15,19 @@ BONUSES = {
     "легендарный": {"name": "Автопобеда", "code": "bonus_4"},
 }
 
+# Порядок редкости (от самой редкой к самой частой)
+RARITY_ORDER = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
+
+def get_best_heroes(collection, count=3):
+    """Выбирает самых редких героев из коллекции"""
+    # Сортируем героев по редкости (сначала легендарные, потом эпические и т.д.)
+    sorted_heroes = sorted(
+        collection.items(),
+        key=lambda item: RARITY_ORDER.get(item[1].get("rarity", "обычный"), 999)
+    )
+    # Берём первых count героев (самые редкие)
+    return [key for key, _ in sorted_heroes[:count]]
+
 async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
@@ -43,22 +56,27 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_message("Соперник уже в игре.")
         return
 
+    # Создаём дуэль
     duel_id = f"{user_id}_{opponent_id}_{random.randint(1000,9999)}"
+    
+    # Выбираем 3 самых редких героя для каждого
+    p1_heroes = get_best_heroes(collection, 3)
+    p2_collection = get_collection(opponent_id)
+    p2_heroes = get_best_heroes(p2_collection, 3)
+
     duels[duel_id] = {
         "player1": user_id,
         "player2": opponent_id,
         "status": "waiting",
         "p1_score": 0,
         "p2_score": 0,
-        "p1_bonuses": [],
-        "p2_bonuses": [],
         "p1_used": [],
         "p2_used": [],
         "questions": random.sample(QUESTIONS, 3),
         "turn": 0,
         "current_player": user_id,
-        "p1_chosen_cards": [],
-        "p2_chosen_cards": [],
+        "p1_heroes": p1_heroes,
+        "p2_heroes": p2_heroes,
         "p1_ready": False,
         "p2_ready": False,
     }
@@ -66,121 +84,88 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_duel[user_id] = duel_id
     user_duel[opponent_id] = duel_id
 
-    await send_message("⚔️ *Соперник найден!* Выбери 3 героя:", parse_mode="Markdown")
-    await show_card_selection(update, context, user_id, duel_id)
+    # Отправляем сообщение игроку
+    p1_names = []
+    for key in p1_heroes:
+        if key in collection:
+            p1_names.append(f"{collection[key]['name']} ({collection[key]['rarity']})")
+    
+    await send_message(
+        f"⚔️ *Соперник найден!*\n\n"
+        f"Твои лучшие герои для дуэли:\n" + "\n".join([f"• {name}" for name in p1_names]) + 
+        f"\n\nОжидай, пока соперник подтвердит готовность.",
+        parse_mode="Markdown"
+    )
+    await show_waiting_screen(update, context, user_id, duel_id)
 
+    # Отправляем сообщение сопернику
     try:
+        p2_names = []
+        for key in p2_heroes:
+            if key in p2_collection:
+                p2_names.append(f"{p2_collection[key]['name']} ({p2_collection[key]['rarity']})")
+        
         await context.bot.send_message(
             opponent_id,
-            f"⚔️ *{update.effective_user.first_name} вызвал тебя!* Выбери 3 героя:",
-            parse_mode="Markdown"
+            f"⚔️ *{update.effective_user.first_name} вызвал тебя на дуэль!*\n\n"
+            f"Твои лучшие герои для дуэли:\n" + "\n".join([f"• {name}" for name in p2_names]) +
+            f"\n\nНажми «Готово», чтобы начать.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Готово", callback_data=f"dready_{duel_id}_{opponent_id}")]
+            ])
         )
-        await show_card_selection(update, context, opponent_id, duel_id, is_opponent=True)
     except Exception as e:
         await send_message(f"⚠️ Ошибка: {e}")
         cancel_duel(duel_id)
         return
 
-async def show_card_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, duel_id: str, is_opponent=False):
-    collection = get_collection(user_id)
-    if not collection:
-        await context.bot.send_message(user_id, "❌ Нет героев.")
-        return
-
-    duel = duels.get(duel_id)
-    if not duel:
-        return
-
-    selected = duel.get("p1_chosen_cards", []) if user_id == duel["player1"] else duel.get("p2_chosen_cards", [])
-    
-    # Берём до 12 героев (чтобы не перегружать)
-    items = list(collection.items())[:12]
-    keyboard = []
-    for key, hero in items:
-        if key in selected:
-            btn_text = f"✅ {hero['name']} ({hero['rarity']})"
-        else:
-            btn_text = f"➕ {hero['name']} ({hero['rarity']})"
-        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"dc_{duel_id}_{user_id}_{key}")])
-    
-    keyboard.append([InlineKeyboardButton(f"✅ Готово ({len(selected)}/3)", callback_data=f"dr_{duel_id}_{user_id}")])
-    keyboard.append([InlineKeyboardButton("🔄 Сброс", callback_data=f"dreset_{duel_id}_{user_id}")])
-
+async def show_waiting_screen(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, duel_id: str):
     await context.bot.send_message(
         user_id,
-        "🃏 *Выбери 3 героя:*",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "⏳ Ожидаем, пока соперник подтвердит готовность...",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Проверить статус", callback_data=f"dcheck_{duel_id}_{user_id}")]
+        ])
     )
 
-async def card_selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data.split("_")
-    
-    if data[0] == "dc":
-        _, duel_id, user_id, hero_key = data
-        user_id = int(user_id)
+    if data[0] == "dcheck":
+        duel_id = data[1]
+        user_id = int(data[2])
         duel = duels.get(duel_id)
         if not duel:
             await query.edit_message_text("❌ Дуэль завершена.")
             return
-
-        if user_id == duel["player1"]:
-            selected = duel.get("p1_chosen_cards", [])
+        if duel.get("p1_ready") and duel.get("p2_ready"):
+            await query.edit_message_text("✅ Соперник готов! Начинаем дуэль!")
+            await start_duel(update, context, duel_id)
         else:
-            selected = duel.get("p2_chosen_cards", [])
+            await query.answer("Соперник ещё не готов. Подожди.")
 
-        if hero_key in selected:
-            selected.remove(hero_key)
-        else:
-            if len(selected) >= 3:
-                await query.answer("Только 3 героя!")
-                return
-            selected.append(hero_key)
-
-        await show_card_selection(update, context, user_id, duel_id)
-
-    elif data[0] == "dr":
-        _, duel_id, user_id = data
-        user_id = int(user_id)
+async def ready_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data.split("_")
+    if data[0] == "dready":
+        duel_id = data[1]
+        user_id = int(data[2])
         duel = duels.get(duel_id)
         if not duel:
             await query.edit_message_text("❌ Дуэль завершена.")
             return
-
         if user_id == duel["player1"]:
-            selected = duel.get("p1_chosen_cards", [])
             duel["p1_ready"] = True
         else:
-            selected = duel.get("p2_chosen_cards", [])
             duel["p2_ready"] = True
 
-        if len(selected) < 3:
-            await query.answer(f"Выбери ещё {3 - len(selected)}!")
-            return
-
-        await query.edit_message_text("✅ Готово! Ожидаем соперника.")
+        await query.edit_message_text("✅ Ты готов! Ожидаем соперника.")
 
         if duel.get("p1_ready") and duel.get("p2_ready"):
             await start_duel(update, context, duel_id)
-
-    elif data[0] == "dreset":
-        _, duel_id, user_id = data
-        user_id = int(user_id)
-        duel = duels.get(duel_id)
-        if not duel:
-            await query.edit_message_text("❌ Дуэль завершена.")
-            return
-
-        if user_id == duel["player1"]:
-            duel["p1_chosen_cards"] = []
-            duel["p1_ready"] = False
-        else:
-            duel["p2_chosen_cards"] = []
-            duel["p2_ready"] = False
-
-        await show_card_selection(update, context, user_id, duel_id)
 
 async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_id: str):
     duel = duels.get(duel_id)
@@ -190,21 +175,6 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_id
     duel["status"] = "active"
     p1 = duel["player1"]
     p2 = duel["player2"]
-
-    for pid in [p1, p2]:
-        bonuses = []
-        key = "p1_chosen_cards" if pid == p1 else "p2_chosen_cards"
-        for hero_key in duel.get(key, []):
-            coll = get_collection(pid)
-            if hero_key in coll:
-                hero = coll[hero_key]
-                rarity = hero.get("rarity", "обычный")
-                bonuses.append({
-                    "hero": hero["name"],
-                    "rarity": rarity,
-                    "bonus": BONUSES.get(rarity, BONUSES["обычный"])
-                })
-        duel[f"p{1 if pid == p1 else 2}_bonuses"] = bonuses
 
     await context.bot.send_message(p1, "⚔️ *Дуэль началась!* Твой ход.", parse_mode="Markdown")
     await context.bot.send_message(p2, "⚔️ *Дуэль началась!* Ожидай.", parse_mode="Markdown")
@@ -230,15 +200,23 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     for idx, option in enumerate(question["options"]):
         keyboard.append([InlineKeyboardButton(option, callback_data=f"da_{duel_id}_{current_player}_{idx}")])
 
-    bonuses = duel.get(f"{player_key}_bonuses", [])
+    # Бонусы от героев
+    hero_keys = duel.get("p1_heroes", []) if current_player == duel["player1"] else duel.get("p2_heroes", [])
     used = duel.get(f"{player_key}_used", [])
     bonus_buttons = []
-    for b in bonuses:
-        if b["bonus"]["code"] not in used:
-            bonus_buttons.append(InlineKeyboardButton(
-                f"💡 {b['bonus']['name']} ({b['hero']})",
-                callback_data=f"db_{duel_id}_{current_player}_{b['bonus']['code']}"
-            ))
+    
+    coll = get_collection(current_player)
+    for i, hero_key in enumerate(hero_keys):
+        if hero_key in coll:
+            hero = coll[hero_key]
+            rarity = hero.get("rarity", "обычный")
+            bonus = BONUSES.get(rarity, BONUSES["обычный"])
+            if bonus["code"] not in used:
+                bonus_buttons.append(InlineKeyboardButton(
+                    f"💡 {bonus['name']} ({hero['name']})",
+                    callback_data=f"db_{duel_id}_{current_player}_{bonus['code']}_{i}"
+                ))
+    
     if bonus_buttons:
         keyboard.append(bonus_buttons)
 
@@ -299,7 +277,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await ask_question(update, context, duel_id)
 
     elif data[0] == "db":
-        _, duel_id, player_id, bonus_code = data
+        _, duel_id, player_id, bonus_code, hero_idx = data
         player_id = int(player_id)
         duel = duels.get(duel_id)
         if not duel:
@@ -316,12 +294,17 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if bonus_code == "bonus_1":
             duel[f"{player_key}_score"] += 1
-            await query.edit_message_text("💪 +1 очко!")
+            await query.edit_message_text("💪 +1 очко за «Уверенность»!")
+        elif bonus_code == "bonus_2":
+            await query.edit_message_text("🔍 «Подсказка» активирована! Один неверный вариант убран.")
+            # Здесь можно реализовать логику подсказки, но для простоты оставляем уведомление
+        elif bonus_code == "bonus_3":
+            await query.edit_message_text("🔄 «Пересдача» активирована! При ошибке сможешь ответить ещё раз.")
         elif bonus_code == "bonus_4":
             q_index = duel["turn"]
             if q_index < len(duel["questions"]):
                 duel[f"{player_key}_score"] += 1
-                await query.edit_message_text("⭐ Автопобеда! Вопрос засчитан.")
+                await query.edit_message_text("⭐ «Автопобеда»! Вопрос засчитан.")
                 duel["turn"] += 1
                 if duel["current_player"] == duel["player1"]:
                     duel["current_player"] = duel["player2"]
