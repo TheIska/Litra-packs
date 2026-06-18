@@ -44,11 +44,9 @@ def load_cover(book_name):
                 if 'imageLinks' in volume:
                     cover_url = volume['imageLinks'].get('thumbnail')
                     if cover_url:
-                        # Скачиваем обложку
                         with urllib.request.urlopen(cover_url, timeout=5) as img_response:
                             img_data = img_response.read()
                             img = Image.open(io.BytesIO(img_data)).convert("RGBA")
-                            # Сохраняем локально, чтобы не качать каждый раз
                             try:
                                 os.makedirs(COVERS_DIR, exist_ok=True)
                                 local_path = os.path.join(COVERS_DIR, f"{clean_name}.jpg")
@@ -66,45 +64,18 @@ def create_hero_card(hero):
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
-    # Цвета для разных редкостей
     colors = {
-        "легендарный": {
-            "bg": (30, 20, 15),
-            "border": (255, 215, 0),
-            "accent": (255, 215, 0),
-            "text": (255, 255, 255),
-            "rarity_color": (255, 215, 0)
-        },
-        "эпический": {
-            "bg": (25, 15, 40),
-            "border": (155, 89, 182),
-            "accent": (155, 89, 182),
-            "text": (255, 255, 255),
-            "rarity_color": (155, 89, 182)
-        },
-        "редкий": {
-            "bg": (15, 25, 40),
-            "border": (52, 152, 219),
-            "accent": (52, 152, 219),
-            "text": (255, 255, 255),
-            "rarity_color": (52, 152, 219)
-        },
-        "обычный": {
-            "bg": (30, 30, 30),
-            "border": (149, 165, 166),
-            "accent": (149, 165, 166),
-            "text": (220, 220, 220),
-            "rarity_color": (149, 165, 166)
-        }
+        "легендарный": {"bg": (30, 20, 15), "border": (255, 215, 0), "accent": (255, 215, 0), "text": (255, 255, 255), "rarity_color": (255, 215, 0)},
+        "эпический": {"bg": (25, 15, 40), "border": (155, 89, 182), "accent": (155, 89, 182), "text": (255, 255, 255), "rarity_color": (155, 89, 182)},
+        "редкий": {"bg": (15, 25, 40), "border": (52, 152, 219), "accent": (52, 152, 219), "text": (255, 255, 255), "rarity_color": (52, 152, 219)},
+        "обычный": {"bg": (30, 30, 30), "border": (149, 165, 166), "accent": (149, 165, 166), "text": (220, 220, 220), "rarity_color": (149, 165, 166)}
     }
 
     pal = colors.get(rarity, colors["обычный"])
 
-    # Создаём фон
     img = Image.new('RGB', (width, height), color=pal["bg"])
     draw = ImageDraw.Draw(img)
 
-    # Шрифты
     font_title = load_font(22)
     font_name = load_font(36)
     font_book = load_font(20)
@@ -114,16 +85,12 @@ def create_hero_card(hero):
 
     # Рамка
     border_width = 8
-    draw.rectangle(
-        [(border_width, border_width), (width - border_width, height - border_width)],
-        outline=pal["border"],
-        width=3
-    )
+    draw.rectangle([(border_width, border_width), (width - border_width, height - border_width)], outline=pal["border"], width=3)
 
     # Заголовок
     draw.text((width//2, 15), "ЛИТЕРАТУРНЫЙ ГЕРОЙ", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # Обложка книги
+    # Обложка
     cover_img = load_cover(hero["book"])
     if cover_img:
         cover_img = cover_img.resize((180, 250), Image.Resampling.LANCZOS)
@@ -154,19 +121,13 @@ def create_hero_card(hero):
     y_offset += 45
 
     # Редкость
-    rarity_labels = {
-        "легендарный": "ЛЕГЕНДАРНЫЙ",
-        "эпический": "ЭПИЧЕСКИЙ",
-        "редкий": "РЕДКИЙ",
-        "обычный": "ОБЫЧНЫЙ"
-    }
+    rarity_labels = {"легендарный": "ЛЕГЕНДАРНЫЙ", "эпический": "ЭПИЧЕСКИЙ", "редкий": "РЕДКИЙ", "обычный": "ОБЫЧНЫЙ"}
     rarity_text = rarity_labels.get(rarity, "ОБЫЧНЫЙ")
     draw.text((width//2, y_offset), rarity_text, fill=pal["rarity_color"], font=font_rarity, anchor="mt")
 
     # Нижний колонтитул
     draw.text((width//2, height - 20), "Создано с любовью к литературе", fill=(80, 80, 80), font=font_footer, anchor="mt")
 
-    # Сохраняем
     bio = io.BytesIO()
     img.save(bio, format='PNG')
     bio.seek(0)
