@@ -1,19 +1,22 @@
 import sqlite3
 import json
+import os
 from datetime import datetime
 from typing import Dict, Optional, Any
 
-DB_PATH = "bot_data.db"
+# База данных теперь в папке data/
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
 
 def get_connection():
     """Возвращает соединение с базой данных"""
+    # Создаём папку data/, если её нет
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_db():
     """Создаёт таблицы, если их нет"""
     conn = get_connection()
     c = conn.cursor()
-    # Таблица пользователей с монетами
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -24,7 +27,6 @@ def init_db():
             coins INTEGER DEFAULT 500
         )
     ''')
-    # Таблица коллекции
     c.execute('''
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +42,6 @@ def init_db():
     conn.close()
 
 def get_user(user_id: int) -> Dict[str, Any]:
-    """Получить данные пользователя или создать нового"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT last_free_pack, wins, losses, rating, coins FROM users WHERE user_id = ?", (user_id,))
@@ -62,7 +63,6 @@ def get_user(user_id: int) -> Dict[str, Any]:
     return result
 
 def get_collection(user_id: int) -> Dict[str, Dict]:
-    """Получить коллекцию героев пользователя"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT hero_key, hero_data FROM collection WHERE user_id = ?", (user_id,))
@@ -74,7 +74,6 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     return result
 
 def add_hero_to_collection(user_id: int, hero: Dict) -> None:
-    """Добавить героя в коллекцию"""
     hero_key = f"{hero['author']} – {hero['name']}"
     conn = get_connection()
     c = conn.cursor()
@@ -86,7 +85,6 @@ def add_hero_to_collection(user_id: int, hero: Dict) -> None:
     conn.close()
 
 def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
-    """Обновить время последнего бесплатного пака"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE users SET last_free_pack = ? WHERE user_id = ?", (timestamp.isoformat(), user_id))
@@ -94,7 +92,6 @@ def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
     conn.close()
 
 def update_duel_stats(user_id: int, win: bool) -> None:
-    """Обновить статистику дуэлей"""
     conn = get_connection()
     c = conn.cursor()
     if win:
@@ -105,7 +102,6 @@ def update_duel_stats(user_id: int, win: bool) -> None:
     conn.close()
 
 def get_opponent(user_id: int) -> Optional[int]:
-    """Найти случайного соперника для дуэли"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT user_id FROM users WHERE user_id != ? ORDER BY RANDOM() LIMIT 1", (user_id,))
@@ -114,7 +110,6 @@ def get_opponent(user_id: int) -> Optional[int]:
     return row[0] if row else None
 
 def add_coins(user_id: int, amount: int) -> None:
-    """Добавить монеты пользователю"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE users SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
@@ -122,7 +117,6 @@ def add_coins(user_id: int, amount: int) -> None:
     conn.close()
 
 def spend_coins(user_id: int, amount: int) -> bool:
-    """Списать монеты, если достаточно. Возвращает True, если успешно."""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT coins FROM users WHERE user_id = ?", (user_id,))
