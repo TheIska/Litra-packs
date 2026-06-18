@@ -75,6 +75,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_duel[user_id] = duel_id
     user_duel[opponent_id] = duel_id
 
+    # Отправляем сообщение о начале дуэли
     await send_message(
         f"⚔️ *Дуэль началась!*\n"
         f"Твои герои: {', '.join([collection[k]['name'] for k in p1_chosen])}\n"
@@ -122,7 +123,7 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
             rarity = hero.get("rarity", "обычный")
             bonus = BONUSES.get(rarity, BONUSES["обычный"])
             if bonus["code"] not in used:
-                # Используем другой разделитель для бонусов, чтобы избежать конфликта с _
+                # Используем '|' как разделитель
                 bonus_buttons.append(InlineKeyboardButton(
                     f"💡 {bonus['name']} ({hero['name']})",
                     callback_data=f"bon|{duel_id}|{current_player}|{bonus['code']}"
@@ -150,14 +151,24 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    parts = data.split("|")
+    
+    # Проверяем, какой у нас разделитель
+    if "|" in data:
+        parts = data.split("|")
+    else:
+        parts = data.split("_")
+    
     action = parts[0]
 
     if action == "ans":
         # ans_duel_id_player_id_answer_idx
-        _, duel_id, player_id, answer_idx = parts
-        player_id = int(player_id)
-        answer_idx = int(answer_idx)
+        if len(parts) >= 4:
+            duel_id = parts[1]
+            player_id = int(parts[2])
+            answer_idx = int(parts[3])
+        else:
+            return
+            
         duel = duels.get(duel_id)
         if not duel or duel["status"] != "active" or duel["current_player"] != player_id:
             await query.edit_message_text("⏳ Не твой ход.")
@@ -192,8 +203,13 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "bon":
         # bon|duel_id|player_id|bonus_code
-        _, duel_id, player_id, bonus_code = parts
-        player_id = int(player_id)
+        if len(parts) >= 4:
+            duel_id = parts[1]
+            player_id = int(parts[2])
+            bonus_code = parts[3]
+        else:
+            return
+            
         duel = duels.get(duel_id)
         if not duel:
             await query.edit_message_text("❌ Дуэль завершена.")
@@ -231,8 +247,12 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "sur":
         # sur|duel_id|player_id
-        _, duel_id, player_id = parts
-        player_id = int(player_id)
+        if len(parts) >= 3:
+            duel_id = parts[1]
+            player_id = int(parts[2])
+        else:
+            return
+            
         duel = duels.get(duel_id)
         if not duel:
             await query.edit_message_text("❌ Дуэль завершена.")

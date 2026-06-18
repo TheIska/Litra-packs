@@ -47,9 +47,9 @@ def main():
 
     # Дуэли
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^bon_"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^sur_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^bon"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^sur"))
 
     print("🤖 Бот запущен!")
     app.run_polling()
