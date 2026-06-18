@@ -45,11 +45,11 @@ def main():
     # Коллекция
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
 
-    # Дуэли
+    # Дуэли (короткие паттерны)
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^bon"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^sur"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^a_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b_"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s_"))
 
     print("🤖 Бот запущен!")
     app.run_polling()

@@ -9,10 +9,10 @@ duels = {}
 user_duel = {}
 
 BONUSES = {
-    "обычный": {"name": "Уверенность", "code": "bonus_1"},
-    "редкий": {"name": "Подсказка", "code": "bonus_2"},
-    "эпический": {"name": "Пересдача", "code": "bonus_3"},
-    "легендарный": {"name": "Автопобеда", "code": "bonus_4"},
+    "обычный": {"name": "Уверенность", "code": "b1"},
+    "редкий": {"name": "Подсказка", "code": "b2"},
+    "эпический": {"name": "Пересдача", "code": "b3"},
+    "легендарный": {"name": "Автопобеда", "code": "b4"},
 }
 
 async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -45,7 +45,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     hero_keys = list(collection.keys())
     if len(hero_keys) < 3:
-        await send_message("❌ У тебя меньше 3 героев. Открой паки!")
+        await send_message("❌ У тебя меньше 3 героев.")
         return
 
     p1_chosen = random.sample(hero_keys, 3)
@@ -75,7 +75,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_duel[user_id] = duel_id
     user_duel[opponent_id] = duel_id
 
-    # Отправляем сообщение о начале дуэли
     await send_message(
         f"⚔️ *Дуэль началась!*\n"
         f"Твои герои: {', '.join([collection[k]['name'] for k in p1_chosen])}\n"
@@ -111,7 +110,7 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
 
     keyboard = []
     for idx, option in enumerate(question["options"]):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f"ans_{duel_id}_{current_player}_{idx}")])
+        keyboard.append([InlineKeyboardButton(option, callback_data=f"a_{duel_id}_{current_player}_{idx}")])
 
     hero_keys = duel["p1_chosen"] if current_player == duel["player1"] else duel["p2_chosen"]
     used = duel.get(f"{player_key}_used", [])
@@ -123,16 +122,15 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
             rarity = hero.get("rarity", "обычный")
             bonus = BONUSES.get(rarity, BONUSES["обычный"])
             if bonus["code"] not in used:
-                # Используем '|' как разделитель
                 bonus_buttons.append(InlineKeyboardButton(
                     f"💡 {bonus['name']} ({hero['name']})",
-                    callback_data=f"bon|{duel_id}|{current_player}|{bonus['code']}"
+                    callback_data=f"b_{duel_id}_{current_player}_{bonus['code']}"
                 ))
 
     if bonus_buttons:
         keyboard.append(bonus_buttons)
 
-    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"sur|{duel_id}|{current_player}")])
+    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"s_{duel_id}_{current_player}")])
 
     await context.bot.send_message(
         current_player,
@@ -151,23 +149,14 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    
-    # Проверяем, какой у нас разделитель
-    if "|" in data:
-        parts = data.split("|")
-    else:
-        parts = data.split("_")
-    
+    parts = data.split("_")
     action = parts[0]
 
-    if action == "ans":
-        # ans_duel_id_player_id_answer_idx
-        if len(parts) >= 4:
-            duel_id = parts[1]
-            player_id = int(parts[2])
-            answer_idx = int(parts[3])
-        else:
-            return
+    if action == "a":
+        # a_duel_id_player_id_answer_idx
+        duel_id = parts[1]
+        player_id = int(parts[2])
+        answer_idx = int(parts[3])
             
         duel = duels.get(duel_id)
         if not duel or duel["status"] != "active" or duel["current_player"] != player_id:
@@ -185,7 +174,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("✅ *Правильно!* +1 очко.", parse_mode="Markdown")
         else:
             used = duel.get(f"{player_key}_used", [])
-            if "bonus_3" in used:
+            if "b3" in used:
                 await query.edit_message_text("❌ Неправильно! Есть «Пересдача»! Попробуй ещё раз.")
                 await ask_question(update, context, duel_id)
                 return
@@ -201,14 +190,11 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(0.5)
         await ask_question(update, context, duel_id)
 
-    elif action == "bon":
-        # bon|duel_id|player_id|bonus_code
-        if len(parts) >= 4:
-            duel_id = parts[1]
-            player_id = int(parts[2])
-            bonus_code = parts[3]
-        else:
-            return
+    elif action == "b":
+        # b_duel_id_player_id_bonus_code
+        duel_id = parts[1]
+        player_id = int(parts[2])
+        bonus_code = parts[3]
             
         duel = duels.get(duel_id)
         if not duel:
@@ -223,14 +209,14 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         used.append(bonus_code)
 
-        if bonus_code == "bonus_1":
+        if bonus_code == "b1":
             duel[f"{player_key}_score"] += 1
             await query.edit_message_text("💪 +1 очко за «Уверенность»!")
-        elif bonus_code == "bonus_2":
+        elif bonus_code == "b2":
             await query.edit_message_text("🔍 «Подсказка» активирована!")
-        elif bonus_code == "bonus_3":
+        elif bonus_code == "b3":
             await query.edit_message_text("🔄 «Пересдача» активирована!")
-        elif bonus_code == "bonus_4":
+        elif bonus_code == "b4":
             q_index = duel["turn"]
             if q_index < len(duel["questions"]):
                 duel[f"{player_key}_score"] += 1
@@ -245,13 +231,10 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(f"🔍 Бонус активирован!")
 
-    elif action == "sur":
-        # sur|duel_id|player_id
-        if len(parts) >= 3:
-            duel_id = parts[1]
-            player_id = int(parts[2])
-        else:
-            return
+    elif action == "s":
+        # s_duel_id_player_id
+        duel_id = parts[1]
+        player_id = int(parts[2])
             
         duel = duels.get(duel_id)
         if not duel:
