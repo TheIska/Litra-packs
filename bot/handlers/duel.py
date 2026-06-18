@@ -87,9 +87,14 @@ async def show_card_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.send_message(user_id, "❌ У тебя нет героев для дуэли.")
         return
 
+    # Показываем всех героев (до 20)
     items = list(collection.items())[:20]
     keyboard = []
     duel = duels.get(duel_id)
+    if not duel:
+        await context.bot.send_message(user_id, "❌ Дуэль уже завершена.")
+        return
+
     selected = duel.get("p1_chosen_cards", []) if user_id == duel["player1"] else duel.get("p2_chosen_cards", [])
     
     for key, hero in items:
@@ -97,17 +102,14 @@ async def show_card_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
             btn_text = f"✅ {hero['name']} ({hero['rarity']})"
         else:
             btn_text = f"➕ {hero['name']} ({hero['rarity']})"
-        keyboard.append([InlineKeyboardButton(
-            btn_text,
-            callback_data=f"duel_card_{duel_id}_{user_id}_{key}"
-        )])
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"duel_card_{duel_id}_{user_id}_{key}")])
     
     keyboard.append([InlineKeyboardButton(f"✅ Готово (выбрано {len(selected)}/3)", callback_data=f"duel_ready_{duel_id}_{user_id}")])
     keyboard.append([InlineKeyboardButton("🔄 Сбросить выбор", callback_data=f"duel_reset_{duel_id}_{user_id}")])
 
     await context.bot.send_message(
         user_id,
-        "🃏 Выбери *3 героя* для бонусов (нажимай на героев, чтобы добавить/убрать):",
+        "🃏 *Выбери 3 героя* для бонусов (нажимай на героев, чтобы добавить/убрать):",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -140,6 +142,7 @@ async def card_selection_callback(update: Update, context: ContextTypes.DEFAULT_
             selected.append(hero_key)
             action = "добавил"
 
+        # Обновляем клавиатуру
         await show_card_selection(update, context, user_id, duel_id)
         await query.answer(f"Ты {action} героя! Осталось выбрать {3 - len(selected)}.")
 
