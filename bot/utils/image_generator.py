@@ -8,53 +8,64 @@ from PIL import Image, ImageDraw, ImageFont
 COVERS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'covers')
 FONTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
 
-def load_font(size):
-    """Загружает шрифт из папки fonts с подробными логами"""
-    print(f"🔍 Ищем шрифт в: {FONTS_DIR}")
-    
+# Прямая ссылка на шрифт Playfair Display (Google Fonts)
+FONT_URL = "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Regular.ttf"
+
+def download_font():
+    """Скачивает шрифт из интернета, если его нет локально"""
     try:
-        # Проверяем, существует ли папка
-        if not os.path.exists(FONTS_DIR):
-            print(f"❌ Папка {FONTS_DIR} не существует!")
-            return ImageFont.load_default()
-        
-        # Проверяем содержимое папки
-        files = os.listdir(FONTS_DIR)
-        print(f"📂 Содержимое папки fonts: {files}")
-        
-        # Ищем любой .ttf или .otf файл
-        for f in files:
-            if f.endswith('.ttf') or f.endswith('.otf'):
-                font_path = os.path.join(FONTS_DIR, f)
-                print(f"✅ Загружаю шрифт: {font_path}")
-                return ImageFont.truetype(font_path, size)
-        
-        print(f"⚠️ В папке {FONTS_DIR} нет .ttf файлов")
-        return ImageFont.load_default()
+        os.makedirs(FONTS_DIR, exist_ok=True)
+        font_path = os.path.join(FONTS_DIR, "regular.ttf")
+        if not os.path.exists(font_path):
+            print(f"⬇️ Скачиваю шрифт с {FONT_URL}")
+            urllib.request.urlretrieve(FONT_URL, font_path)
+            print(f"✅ Шрифт сохранён: {font_path}")
+        return font_path
     except Exception as e:
-        print(f"❌ Ошибка загрузки шрифта: {e}")
-        return ImageFont.load_default()
+        print(f"❌ Не удалось скачать шрифт: {e}")
+        return None
+
+def load_font(size):
+    """Загружает шрифт: сначала ищет локально, потом скачивает из интернета"""
+    # Пробуем загрузить уже скачанный шрифт
+    font_path = os.path.join(FONTS_DIR, "regular.ttf")
+    if os.path.exists(font_path):
+        try:
+            print(f"✅ Загружаю локальный шрифт: {font_path}")
+            return ImageFont.truetype(font_path, size)
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки локального шрифта: {e}")
+    
+    # Если локального нет — скачиваем
+    font_path = download_font()
+    if font_path and os.path.exists(font_path):
+        try:
+            print(f"✅ Загружаю скачанный шрифт: {font_path}")
+            return ImageFont.truetype(font_path, size)
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки скачанного шрифта: {e}")
+    
+    # Если ничего не помогло — используем стандартный
+    print("⚠️ Использую стандартный шрифт")
+    return ImageFont.load_default()
 
 def load_cover(book_name):
-    """Загружает обложку книги: сначала локально, потом из интернета через Google Books API"""
-    print(f"📖 Ищем обложку для: {book_name}")
+    """Загружает обложку книги: сначала локально, потом из интернета"""
     clean_name = book_name.replace('"', '').replace('«', '').replace('»', '').replace('?', '').replace('!', '')
     
-    # 1. Пробуем локально
+    # Локально
     extensions = ['.jpg', '.jpeg', '.png', '.webp']
     for ext in extensions:
         path = os.path.join(COVERS_DIR, f"{clean_name}{ext}")
         if os.path.exists(path):
             try:
-                print(f"✅ Обложка найдена локально: {path}")
                 return Image.open(path).convert("RGBA")
-            except Exception as e:
-                print(f"⚠️ Не удалось открыть обложку: {e}")
+            except:
+                pass
     
-    # 2. Ищем через Google Books API
+    # Через Google Books
     try:
         url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{urllib.parse.quote(book_name)}&maxResults=1"
-        print(f"🌐 Ищем обложку в интернете: {url}")
         with urllib.request.urlopen(url, timeout=5) as response:
             data = json.loads(response.read().decode())
             if 'items' in data and len(data['items']) > 0:
@@ -62,27 +73,22 @@ def load_cover(book_name):
                 if 'imageLinks' in volume:
                     cover_url = volume['imageLinks'].get('thumbnail')
                     if cover_url:
-                        print(f"🖼️ Найдена обложка: {cover_url}")
                         with urllib.request.urlopen(cover_url, timeout=5) as img_response:
                             img_data = img_response.read()
                             img = Image.open(io.BytesIO(img_data)).convert("RGBA")
-                            # Сохраняем локально, чтобы не качать каждый раз
                             try:
                                 os.makedirs(COVERS_DIR, exist_ok=True)
                                 local_path = os.path.join(COVERS_DIR, f"{clean_name}.jpg")
                                 img.save(local_path, 'JPEG')
-                                print(f"💾 Обложка сохранена локально: {local_path}")
                             except:
                                 pass
                             return img
     except Exception as e:
-        print(f"❌ Не удалось загрузить обложку для {book_name}: {e}")
+        print(f"Не удалось загрузить обложку для {book_name}: {e}")
     
-    print(f"⚠️ Обложка не найдена для {book_name}")
     return None
 
 def create_hero_card(hero):
-    print(f"🃏 Создаю карточку для: {hero['name']}")
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
@@ -124,11 +130,10 @@ def create_hero_card(hero):
 
     pal = colors.get(rarity, colors["обычный"])
 
-    # Создаём фон
     img = Image.new('RGB', (width, height), color=pal["bg"])
     draw = ImageDraw.Draw(img)
 
-    # Текстура старой бумаги
+    # Текстура
     for i in range(0, height, 3):
         for j in range(0, width, 3):
             noise = random.randint(-8, 8)
@@ -139,7 +144,6 @@ def create_hero_card(hero):
 
     # Загружаем шрифт
     font = load_font(28)
-    print(f"📝 Шрифт загружен: {type(font)}")
 
     # Рамка
     border_width = 8
@@ -163,7 +167,7 @@ def create_hero_card(hero):
     else:
         draw.text((width//2, 150), "📚", fill=pal["border"], font=font, anchor="mt")
 
-    # Имя героя
+    # Имя
     y_offset = 340
     draw.text((width//2 + 2, y_offset + 2), hero["name"], fill=(0,0,0), font=font, anchor="mt")
     draw.text((width//2, y_offset), hero["name"], fill=pal["text"], font=font, anchor="mt")
@@ -194,9 +198,7 @@ def create_hero_card(hero):
     # Нижний колонтитул
     draw.text((width//2, height - 20), "Создано с любовью к литературе", fill=(80, 75, 65), font=font, anchor="mt")
 
-    # Сохраняем
     bio = io.BytesIO()
     img.save(bio, format='PNG')
     bio.seek(0)
-    print(f"✅ Карточка создана для {hero['name']}")
     return bio
