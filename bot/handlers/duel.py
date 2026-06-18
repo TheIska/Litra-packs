@@ -29,7 +29,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_message = update.message.reply_text
 
     if user_id in user_duel:
-        await send_message("⚠️ У тебя уже есть активная дуэль!")
+        await send_message("⚠️ У тебя уже есть активная дуэль! Используй /stopduel, чтобы завершить её.")
         return
 
     collection = get_collection(user_id)
@@ -48,7 +48,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     duel_id = f"{user_id}_{opponent_id}_{random.randint(1000,9999)}"
     
-    # Сортируем героев по редкости
     sorted_items = sorted(
         collection.items(),
         key=lambda item: RARITY_ORDER.get(item[1].get("rarity", "обычный"), 999)
@@ -72,7 +71,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p1_page": 0,
         "p2_page": 0,
         "p1_items": sorted_items,
-        "p2_items": [],  # заполним позже для соперника
+        "p2_items": [],
     }
 
     user_duel[user_id] = duel_id
@@ -82,7 +81,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_selection(update, context, user_id, duel_id)
 
     try:
-        # Сортируем героев соперника
         p2_collection = get_collection(opponent_id)
         p2_items = sorted(
             p2_collection.items(),
@@ -149,7 +147,6 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             btn_text = f"➕ {hero['name']} ({hero['rarity']})"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"sel_{duel_id}_{user_id}_{key}")])
 
-    # Навигация
     nav_buttons = []
     if current_page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"nav_{duel_id}_{user_id}_{current_page - 1}"))
@@ -169,6 +166,54 @@ async def show_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+async def stop_duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /stopduel — завершает текущую дуэль"""
+    user_id = update.effective_user.id
+    
+    if user_id not in user_duel:
+        await update.message.reply_text("❌ У тебя нет активной дуэли.")
+        return
+    
+    duel_id = user_duel[user_id]
+    duel = duels.get(duel_id)
+    if not duel:
+        del user_duel[user_id]
+        await update.message.reply_text("❌ Дуэль уже завершена.")
+        return
+    
+    # Определяем победителя (соперник побеждает)
+    if user_id == duel["player1"]:
+        winner = duel["player2"]
+        loser = duel["player1"]
+    else:
+        winner = duel["player1"]
+        loser = duel["player2"]
+    
+    # Обновляем статистику
+    update_duel_stats(winner, True)
+    update_duel_stats(loser, False)
+    
+    # Отправляем уведомления
+    await context.bot.send_message(
+        winner,
+        f"🏆 *Ты победил!* Соперник завершил дуэль командой /stopduel.\nИтоговый счёт: {duel.get('p1_score', 0)}:{duel.get('p2_score', 0)}",
+        parse_mode="Markdown"
+    )
+    await context.bot.send_message(
+        loser,
+        f"😔 *Ты завершил дуэль командой /stopduel.*\nИтоговый счёт: {duel.get('p1_score', 0)}:{duel.get('p2_score', 0)}",
+        parse_mode="Markdown"
+    )
+    
+    # Удаляем дуэль
+    if duel["player1"] in user_duel:
+        del user_duel[duel["player1"]]
+    if duel["player2"] in user_duel:
+        del user_duel[duel["player2"]]
+    duels.pop(duel_id, None)
+    
+    await update.message.reply_text("🏳️ *Дуэль завершена командой /stopduel.*", parse_mode="Markdown")
 
 async def selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

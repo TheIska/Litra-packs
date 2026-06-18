@@ -7,6 +7,7 @@ from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
+    stop_duel_command,
     selection_callback,
     answer_callback
 )
@@ -24,20 +25,25 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
+    app.add_handler(CommandHandler("stopduel", stop_duel_command))  # <-- НОВАЯ КОМАНДА
     app.add_handler(CommandHandler("addcoins", add_coins_command))
 
+    # Меню
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
     app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
 
+    # Паки
     app.add_handler(CallbackQueryHandler(free_pack, pattern="^free_pack$"))
     app.add_handler(CallbackQueryHandler(small_pack, pattern="^small_pack$"))
     app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
+    # Коллекция
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
 
     # Дуэли
