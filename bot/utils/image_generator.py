@@ -1,5 +1,7 @@
 import io
 import os
+import urllib.request
+import json
 from PIL import Image, ImageDraw, ImageFont
 
 def load_font(size, style="regular"):
@@ -28,18 +30,32 @@ def load_font(size, style="regular"):
     except:
         return ImageFont.load_default()
 
-def load_logo():
-    """Загружает логотип из папки static/images/"""
+def load_cover(book_name):
+    """Загружает обложку книги из интернета через Google Books API"""
     try:
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo.png')
-        if os.path.exists(logo_path):
-            return Image.open(logo_path).convert("RGBA")
-        return None
-    except:
-        return None
+        # Кодируем название для URL
+        import urllib.parse
+        encoded_name = urllib.parse.quote(book_name)
+        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{encoded_name}&maxResults=1"
+        
+        with urllib.request.urlopen(url, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if 'items' in data and len(data['items']) > 0:
+                volume = data['items'][0]['volumeInfo']
+                if 'imageLinks' in volume:
+                    cover_url = volume['imageLinks'].get('thumbnail')
+                    if cover_url:
+                        with urllib.request.urlopen(cover_url, timeout=3) as img_response:
+                            img_data = img_response.read()
+                            img = Image.open(io.BytesIO(img_data)).convert("RGBA")
+                            return img
+    except Exception as e:
+        print(f"Не удалось загрузить обложку: {e}")
+    
+    return None
 
 def create_hero_card(hero):
-    """Создаёт карточку героя с логотипом"""
+    """Создаёт карточку героя с обложкой книги"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
 
@@ -97,7 +113,7 @@ def create_hero_card(hero):
         draw.line([(0, i), (width, i)], fill=(r, g, b))
 
     # Шрифты
-    font_title = load_font(28, "bold")      # Жирный для LITRA PACKS
+    font_title = load_font(28, "bold")
     font_name = load_font(44, "bold")
     font_book = load_font(24, "regular")
     font_author = load_font(22, "italic")
@@ -109,33 +125,38 @@ def create_hero_card(hero):
     draw.rectangle([(border, border), (width - border, height - border)], outline=pal["border"], width=3)
     draw.rectangle([(border + 12, border + 12), (width - border - 12, height - border - 12)], outline=pal["border"], width=1)
 
-    # 2. ЛОГОТИП (в левом верхнем углу)
-    logo = load_logo()
-    if logo:
-        # Масштабируем логотип до 60x60
-        logo = logo.resize((60, 60), Image.Resampling.LANCZOS)
-        # Вставляем в левый верхний угол (отступ 20px)
-        img.paste(logo, (20, 15), logo)
-    
-    # 3. ЗАГОЛОВОК "LITRA PACKS"
+    # 2. ЗАГОЛОВОК
     draw.text((width//2, 22), "LITRA PACKS", fill=pal["accent"], font=font_title, anchor="mt")
 
-    # 4. РАЗДЕЛИТЕЛЬ
+    # 3. РАЗДЕЛИТЕЛЬ
     y = 55
     draw.line([(60, y), (width - 60, y)], fill=pal["border"], width=1)
     y += 25
 
-    # 5. ИМЯ ГЕРОЯ — ЦЕНТР
+    # 4. ОБЛОЖКА КНИГИ (в центре, над именем)
+    cover_img = load_cover(hero["book"])
+    if cover_img:
+        # Уменьшаем обложку до 130x190
+        cover_img = cover_img.resize((130, 190), Image.Resampling.LANCZOS)
+        x = (width - 130) // 2
+        y_cover = 90
+        img.paste(cover_img, (x, y_cover), cover_img)
+        # Рамка вокруг обложки
+        draw.rectangle([(x-3, y_cover-3), (x+133, y_cover+193)], outline=pal["border"], width=2)
+        # Смещаем имя вниз, чтобы не наезжало на обложку
+        name_y = 310
+    else:
+        # Если обложки нет — имя остаётся по центру
+        name_y = height // 2 - 50
+
+    # 5. ИМЯ ГЕРОЯ
     name = hero["name"]
-    name_y = height // 2 - 50
-    
     for dx, dy in [(-3,-3), (-3,3), (3,-3), (3,3)]:
         draw.text((width//2 + dx, name_y + dy), name, fill=(0, 0, 0), font=font_name, anchor="mt")
-    
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
     # 6. РАЗДЕЛИТЕЛЬ
-    y = height // 2 + 40
+    y = name_y + 50
     draw.line([(60, y), (width - 60, y)], fill=pal["accent"], width=1)
     y += 40
 
