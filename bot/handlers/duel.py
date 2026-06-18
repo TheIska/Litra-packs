@@ -110,7 +110,8 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
 
     keyboard = []
     for idx, option in enumerate(question["options"]):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f"a_{duel_id}_{current_player}_{idx}")])
+        # Используем | как разделитель
+        keyboard.append([InlineKeyboardButton(option, callback_data=f"a|{duel_id}|{current_player}|{idx}")])
 
     hero_keys = duel["p1_chosen"] if current_player == duel["player1"] else duel["p2_chosen"]
     used = duel.get(f"{player_key}_used", [])
@@ -124,13 +125,13 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
             if bonus["code"] not in used:
                 bonus_buttons.append(InlineKeyboardButton(
                     f"💡 {bonus['name']} ({hero['name']})",
-                    callback_data=f"b_{duel_id}_{current_player}_{bonus['code']}"
+                    callback_data=f"b|{duel_id}|{current_player}|{bonus['code']}"
                 ))
 
     if bonus_buttons:
         keyboard.append(bonus_buttons)
 
-    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"s_{duel_id}_{current_player}")])
+    keyboard.append([InlineKeyboardButton("🏳️ Сдаться", callback_data=f"s|{duel_id}|{current_player}")])
 
     await context.bot.send_message(
         current_player,
@@ -149,18 +150,22 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    parts = data.split("_")
+    parts = data.split("|")
     action = parts[0]
 
     if action == "a":
-        # a_duel_id_player_id_answer_idx
+        # a|duel_id|player_id|answer_idx
         duel_id = parts[1]
         player_id = int(parts[2])
         answer_idx = int(parts[3])
             
         duel = duels.get(duel_id)
-        if not duel or duel["status"] != "active" or duel["current_player"] != player_id:
-            await query.edit_message_text("⏳ Не твой ход.")
+        if not duel or duel["status"] != "active":
+            await query.edit_message_text("❌ Дуэль уже завершена.")
+            return
+        
+        if duel["current_player"] != player_id:
+            await query.edit_message_text("⏳ Сейчас не твой ход.")
             return
 
         q_index = duel["turn"]
@@ -191,7 +196,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await ask_question(update, context, duel_id)
 
     elif action == "b":
-        # b_duel_id_player_id_bonus_code
+        # b|duel_id|player_id|bonus_code
         duel_id = parts[1]
         player_id = int(parts[2])
         bonus_code = parts[3]
@@ -199,6 +204,10 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duel = duels.get(duel_id)
         if not duel:
             await query.edit_message_text("❌ Дуэль завершена.")
+            return
+
+        if duel["current_player"] != player_id:
+            await query.edit_message_text("⏳ Сейчас не твой ход.")
             return
 
         player_key = "p1" if player_id == duel["player1"] else "p2"
@@ -232,7 +241,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"🔍 Бонус активирован!")
 
     elif action == "s":
-        # s_duel_id_player_id
+        # s|duel_id|player_id
         duel_id = parts[1]
         player_id = int(parts[2])
             
