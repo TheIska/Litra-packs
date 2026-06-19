@@ -152,6 +152,43 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     )
 
 
+async def send_correct_answer_and_continue(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_id: str):
+    """Отправляет правильный ответ и пояснение, затем переходит к следующему вопросу"""
+    duel = duels.get(duel_id)
+    if not duel:
+        return
+
+    q_index = duel["turn"]
+    if q_index >= len(duel["questions"]):
+        await finish_duel(update, context, duel_id)
+        return
+
+    question = duel["questions"][q_index]
+    correct_idx = question["correct"]
+    correct_text = question["options"][correct_idx]
+    
+    # Пояснение – можно взять из вопроса, если есть поле "explanation", иначе формируем простое
+    explanation = question.get("explanation", f"Правильный ответ: {correct_text}")
+    
+    # Отправляем обоим игрокам
+    p1 = duel["player1"]
+    p2 = duel["player2"]
+    
+    message_text = (
+        f"📖 *Правильный ответ:*\n"
+        f"{correct_text}\n\n"
+        f"💡 *Пояснение:*\n{explanation}"
+    )
+    
+    await context.bot.send_message(p1, message_text, parse_mode="Markdown")
+    await context.bot.send_message(p2, message_text, parse_mode="Markdown")
+    
+    # Пауза 2 секунды, затем следующий вопрос
+    await asyncio.sleep(2)
+    duel["turn"] += 1
+    await ask_question(update, context, duel_id)
+
+
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -220,9 +257,8 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"❌ Соперник ответил правильно! Ты не получаешь очко."
             )
 
-            await asyncio.sleep(1.5)
-            duel["turn"] += 1
-            await ask_question(update, context, duel_id)
+            # Показываем правильный ответ и пояснение, затем переходим к следующему вопросу
+            await send_correct_answer_and_continue(update, context, duel_id)
 
         else:
             await query.edit_message_text("❌ *Неправильно.*", parse_mode="Markdown")
@@ -234,11 +270,10 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 duel["waiting_for_answer"] = False
                 await context.bot.send_message(
                     player_id_other,
-                    f"⏳ Оба ответили неправильно! Переходим к следующему вопросу."
+                    f"⏳ Оба ответили неправильно!"
                 )
-                await asyncio.sleep(1.5)
-                duel["turn"] += 1
-                await ask_question(update, context, duel_id)
+                # Показываем правильный ответ и пояснение, затем переходим к следующему вопросу
+                await send_correct_answer_and_continue(update, context, duel_id)
             else:
                 # Ждём ответ соперника
                 await context.bot.send_message(
@@ -290,9 +325,8 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"❌ Соперник использовал «Автопобеду»!"
                 )
 
-                await asyncio.sleep(1.5)
-                duel["turn"] += 1
-                await ask_question(update, context, duel_id)
+                # Показываем правильный ответ и пояснение, затем переходим к следующему вопросу
+                await send_correct_answer_and_continue(update, context, duel_id)
             else:
                 await query.edit_message_text("⚠️ Сейчас нельзя использовать этот бонус!")
         else:
