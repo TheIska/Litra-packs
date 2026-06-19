@@ -1,44 +1,24 @@
 import os
 import asyncio
-from gigachat import GigaChat
+from pathlib import Path
+from pollinations import Pollinations
 from dotenv import load_dotenv
 
-# Загружаем .env из корня проекта
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-env_path = os.path.join(BASE_DIR, '.env')
+env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(env_path)
 
-print(f"🔄 Загрузка .env из: {env_path}")
-print(f"Файл существует: {os.path.exists(env_path)}")
+print("🔄 Инициализация Pollinations AI (бесплатно, без ключей)...")
 
-GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
-GIGACHAT_CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
-GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+# Создаём клиент (API-ключ не требуется!)
+client = Pollinations()
 
-print(f"Client ID: {GIGACHAT_CLIENT_ID[:15] if GIGACHAT_CLIENT_ID else 'НЕ НАЙДЕН'}...")
-print(f"Scope: {GIGACHAT_SCOPE}")
-
-# Инициализация GigaChat
-if GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET:
-    try:
-        giga = GigaChat(
-            client_id=GIGACHAT_CLIENT_ID,
-            client_secret=GIGACHAT_CLIENT_SECRET,
-            scope=GIGACHAT_SCOPE,
-        )
-        print("✅ GigaChat инициализирован успешно!")
-    except Exception as e:
-        print(f"❌ Ошибка инициализации GigaChat: {e}")
-        giga = None
-else:
-    print("❌ GigaChat API ключи не найдены в .env")
-    giga = None
+print("✅ Pollinations AI готов к работе!")
 
 
 async def get_explanation(question_text: str, correct_answer: str, options: list) -> str:
-    if not giga:
-        return f"✅ Правильный ответ: {correct_answer}"
-
+    """
+    Генерирует краткое пояснение к вопросу через Pollinations AI.
+    """
     question_clean = question_text.split(" (")[0] if " (" in question_text else question_text
     options_text = "\n".join([f"{chr(65+i)}) {opt}" for i, opt in enumerate(options)])
 
@@ -52,27 +32,16 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
 Напиши только пояснение, без лишних слов. Пояснение должно объяснять, почему этот ответ правильный. Используй эмодзи: 📚 ✍️ 🎭 📖."""
 
     try:
-        payload = {
-            "model": "GigaChat",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "Ты — эксперт по литературе. Отвечай кратко и понятно."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+        # Отправляем запрос к Pollinations AI (совместимо с OpenAI API)
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Ты — эксперт по литературе. Отвечай кратко и понятно."},
+                {"role": "user", "content": prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 200
-        }
-        
-        print("📤 Отправляю запрос в GigaChat...")
-        response = giga.chat(payload)
-        result = response.choices[0].message.content.strip()
-        print(f"📥 Получен ответ")
-        return result
+            model="openai",  # или "mistral", "llama"
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"❌ Ошибка GigaChat: {e}")
+        print(f"❌ Ошибка Pollinations AI: {e}")
         return f"✅ Правильный ответ: {correct_answer}"
