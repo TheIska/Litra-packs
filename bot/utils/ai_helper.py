@@ -33,10 +33,7 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
     if not giga:
         return f"✅ Правильный ответ: {correct_answer}"
 
-    # Очищаем вопрос от названия произведения в скобках
     question_clean = question_text.split(" (")[0] if " (" in question_text else question_text
-
-    # Формируем варианты с буквами
     options_text = "\n".join([f"{chr(65+i)}) {opt}" for i, opt in enumerate(options)])
 
     prompt = f"""Ты — эксперт по литературе. Дай краткое, понятное пояснение (2-3 предложения) к вопросу.
@@ -49,16 +46,24 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
 Напиши только пояснение, без лишних слов. Пояснение должно объяснять, почему этот ответ правильный. Используй эмодзи: 📚 ✍️ 🎭 📖."""
 
     try:
-        def _sync_call():
-            response = giga.chat(
-                prompt,
-                temperature=0.7,
-                max_tokens=150,
-            )
-            return response.choices[0].message.content
-
-        response = await asyncio.to_thread(_sync_call)
-        return response.strip()
+        payload = {
+            "model": "GigaChat",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Ты — эксперт по литературе. Отвечай кратко и понятно."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 200
+        }
+        
+        response = giga.chat(payload)
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"❌ Ошибка GigaChat: {e}")
         return f"✅ Правильный ответ: {correct_answer}"
