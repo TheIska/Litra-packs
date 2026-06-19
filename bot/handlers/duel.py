@@ -1,5 +1,3 @@
-# bot/handlers/duel.py
-
 import random
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -156,7 +154,6 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
 
 
 async def send_correct_answer_and_continue(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_id: str):
-    """Отправляет правильный ответ и пояснение от GigaChat, затем переходит к следующему вопросу"""
     duel = duels.get(duel_id)
     if not duel:
         return
@@ -170,16 +167,13 @@ async def send_correct_answer_and_continue(update: Update, context: ContextTypes
     correct_idx = question["correct"]
     correct_text = question["options"][correct_idx]
 
-    # Показываем "Генерируем пояснение..." для первого игрока
     p1 = duel["player1"]
     p2 = duel["player2"]
     
-    # Отправляем сообщение о генерации
     loading_msg = "⏳ _Генерирую пояснение..._"
     await context.bot.send_message(p1, loading_msg, parse_mode="Markdown")
     await context.bot.send_message(p2, loading_msg, parse_mode="Markdown")
 
-    # Генерируем пояснение через GigaChat
     explanation = await get_explanation(
         question_text=question["text"],
         correct_answer=correct_text,
