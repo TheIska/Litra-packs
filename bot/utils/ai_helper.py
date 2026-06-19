@@ -1,14 +1,15 @@
 import os
 import asyncio
-from pathlib import Path
 from gigachat import GigaChat
 from dotenv import load_dotenv
 
 # Загружаем .env из корня проекта
-env_path = Path(__file__).parent.parent / '.env'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_path = os.path.join(BASE_DIR, '.env')
 load_dotenv(env_path)
 
 print(f"🔄 Загрузка .env из: {env_path}")
+print(f"Файл существует: {os.path.exists(env_path)}")
 
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 GIGACHAT_CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
@@ -35,11 +36,7 @@ else:
 
 
 async def get_explanation(question_text: str, correct_answer: str, options: list) -> str:
-    """
-    Генерирует краткое пояснение к вопросу через GigaChat.
-    """
     if not giga:
-        print("⚠️ GigaChat не инициализирован, возвращаю только правильный ответ")
         return f"✅ Правильный ответ: {correct_answer}"
 
     question_clean = question_text.split(" (")[0] if " (" in question_text else question_text
@@ -74,7 +71,7 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
         print("📤 Отправляю запрос в GigaChat...")
         response = giga.chat(payload)
         result = response.choices[0].message.content.strip()
-        print(f"📥 Получен ответ: {result[:50]}...")
+        print(f"📥 Получен ответ")
         return result
     except Exception as e:
         print(f"❌ Ошибка GigaChat: {e}")
