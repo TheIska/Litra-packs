@@ -1,5 +1,3 @@
-# bot/utils/ai_helper.py
-
 import os
 import asyncio
 from gigachat import GigaChat
@@ -18,7 +16,6 @@ if GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET:
             client_id=GIGACHAT_CLIENT_ID,
             client_secret=GIGACHAT_CLIENT_SECRET,
             scope=GIGACHAT_SCOPE,
-            verify_ssl_certs=False,
         )
         print("✅ GigaChat инициализирован успешно!")
     except Exception as e:
@@ -56,7 +53,7 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
             response = giga.chat(
                 prompt,
                 temperature=0.7,
-                max_tokens=200,
+                max_tokens=150,
             )
             return response.choices[0].message.content
 
