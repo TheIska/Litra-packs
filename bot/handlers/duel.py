@@ -188,7 +188,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_id = update.effective_user.id
         player_key = "p1" if player_id == duel["player1"] else "p2"
 
-        # Определяем соперника
+        # Правильно определяем соперника
         if player_id == duel["player1"]:
             opponent_key = "p2"
         else:
