@@ -5,9 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+print("🔄 Загрузка .env...")
+
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 GIGACHAT_CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+
+print(f"Client ID: {GIGACHAT_CLIENT_ID[:15] if GIGACHAT_CLIENT_ID else 'НЕ НАЙДЕН'}...")
+print(f"Scope: {GIGACHAT_SCOPE}")
 
 # Инициализация GigaChat
 if GIGACHAT_CLIENT_ID and GIGACHAT_CLIENT_SECRET:
@@ -31,6 +36,7 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
     Генерирует краткое пояснение к вопросу через GigaChat.
     """
     if not giga:
+        print("⚠️ GigaChat не инициализирован, возвращаю только правильный ответ")
         return f"✅ Правильный ответ: {correct_answer}"
 
     question_clean = question_text.split(" (")[0] if " (" in question_text else question_text
@@ -62,8 +68,11 @@ async def get_explanation(question_text: str, correct_answer: str, options: list
             "max_tokens": 200
         }
         
+        print("📤 Отправляю запрос в GigaChat...")
         response = giga.chat(payload)
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        print(f"📥 Получен ответ: {result[:50]}...")
+        return result
     except Exception as e:
         print(f"❌ Ошибка GigaChat: {e}")
         return f"✅ Правильный ответ: {correct_answer}"
