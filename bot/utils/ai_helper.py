@@ -1,11 +1,14 @@
 import os
 import asyncio
+from pathlib import Path
 from gigachat import GigaChat
 from dotenv import load_dotenv
 
-load_dotenv()
+# Загружаем .env из корня проекта
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(env_path)
 
-print("🔄 Загрузка .env...")
+print(f"🔄 Загрузка .env из: {env_path}")
 
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 GIGACHAT_CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
