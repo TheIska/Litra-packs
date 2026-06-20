@@ -1,8 +1,15 @@
 import logging
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
 from .database import init_db, migrate_db
-from .handlers.start import start, help_command, show_coins, shop
+from .handlers.start import (
+    start, 
+    help_command, 
+    show_coins, 
+    shop, 
+    report_error, 
+    forward_to_admin
+)
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.collection import show_collection
 from .handlers.duel import (
@@ -22,7 +29,7 @@ from .handlers.duel import (
     share_link,
 )
 from .handlers.admin import add_coins_command
-from .handlers.quiz import quiz_command, quiz_answer_callback
+from .handlers.quiz import quiz_command, quiz_answer_callback, stop_quiz_command
 from .web.server import keep_alive
 
 logging.basicConfig(
@@ -45,6 +52,7 @@ def main():
     app.add_handler(CommandHandler("stopduel", stop_duel_command))
     app.add_handler(CommandHandler("addcoins", add_coins_command))
     app.add_handler(CommandHandler("quiz", quiz_command))
+    app.add_handler(CommandHandler("stopquiz", stop_quiz_command))
 
     # ========== CALLBACK'И МЕНЮ ==========
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
@@ -52,6 +60,7 @@ def main():
     app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
     app.add_handler(CallbackQueryHandler(help_command, pattern="^help$"))
     app.add_handler(CallbackQueryHandler(quiz_command, pattern="^quiz$"))
+    app.add_handler(CallbackQueryHandler(report_error, pattern="^report_error$"))
 
     # ========== ПАКИ ==========
     app.add_handler(CallbackQueryHandler(free_pack, pattern="^free_pack$"))
@@ -87,6 +96,9 @@ def main():
 
     # ========== ВИКТОРИНА (ответы) ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
+
+    # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
 
     print("🤖 Бот запущен!")
     app.run_polling()

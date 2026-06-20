@@ -1,4 +1,4 @@
-from .start import start, help_command, show_coins, shop
+from .start import start, help_command, show_coins, shop, report_error, forward_to_admin
 from .pack import free_pack, small_pack, medium_pack, large_pack
 from .collection import show_collection
 from .duel import (
@@ -19,4 +19,4 @@ from .duel import (
     cancel_duel
 )
 from .admin import add_coins_command
-from .quiz import quiz_command, quiz_answer_callback
+from .quiz import quiz_command, quiz_answer_callback, stop_quiz_command

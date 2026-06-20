@@ -3,6 +3,9 @@ from telegram.ext import ContextTypes
 from ..database import get_user, get_collection
 from datetime import datetime, timedelta
 
+# ID админа (твой Telegram ID)
+ADMIN_ID = 6082384471
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
@@ -22,11 +25,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         timer_text = "✅ Бесплатный пак доступен!"
 
     keyboard = [
-        [InlineKeyboardButton("📝 Ежедневная викторина", callback_data="quiz")],
+        [InlineKeyboardButton("📝 Викторина", callback_data="quiz")],
         [InlineKeyboardButton("🛒 Магазин паков", callback_data="shop")],
         [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
         [InlineKeyboardButton("⚔️ Дуэль", callback_data="duel")],
-        [InlineKeyboardButton("❓ Помощь / Команды", callback_data="help")],
+        [InlineKeyboardButton("📩 Сообщить об ошибке", callback_data="report_error")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -72,8 +75,63 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки 'Сообщить об ошибке'"""
+    query = update.callback_query
+    await query.answer()
+    
+    text = (
+        "📩 *Сообщить об ошибке*\n\n"
+        "Если ты нашёл ошибку в боте или хочешь предложить идею, напиши мне напрямую:\n\n"
+        f"👤 *Разработчик:* @your_username\n\n"
+        "_Или просто отправь сообщение с описанием проблемы — я увижу!_"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
+    ]
+    
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Пересылает сообщение пользователя админу (если бот получает текст)"""
+    if update.message and update.message.text:
+        user = update.effective_user
+        user_name = user.first_name or "Пользователь"
+        user_id = user.id
+        username = f"@{user.username}" if user.username else "без username"
+        
+        message_text = (
+            f"📩 *Новое сообщение от пользователя*\n\n"
+            f"👤 Имя: {user_name}\n"
+            f"🆔 ID: {user_id}\n"
+            f"🔗 {username}\n\n"
+            f"📝 Сообщение:\n{update.message.text}"
+        )
+        
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=message_text,
+                parse_mode="Markdown"
+            )
+            await update.message.reply_text(
+                "✅ Сообщение отправлено разработчику! Спасибо за обратную связь."
+            )
+        except Exception as e:
+            print(f"❌ Ошибка отправки админу: {e}")
+            await update.message.reply_text(
+                "❌ Не удалось отправить сообщение. Попробуй позже."
+            )
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает справку по командам"""
+    """Команда /help (оставляем для команд)"""
     query = update.callback_query
     if query:
         try:
@@ -92,16 +150,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help — Эта справка\n"
         "/duel — Начать дуэль\n"
         "/stopduel — Завершить дуэль\n"
-        "/free_pack — Открыть бесплатный пак\n"
-        "/collection — Моя коллекция\n"
-        "/shop — Магазин паков\n"
-        "/quiz — Ежедневная викторина\n"
+        "/quiz — Викторина\n"
+        "/stopquiz — Завершить викторину\n"
         "/addcoins — (админ) Добавить монеты\n\n"
         "📌 *Как играть*\n"
         "1. Бесплатный пак каждые 3 часа.\n"
         "2. Покупай паки за монеты с лучшими шансами.\n"
         "3. Участвуй в дуэлях и зарабатывай монеты.\n"
-        "4. Собирай коллекцию и готовься к ЕГЭ!"
+        "4. Собирай коллекцию и готовься к ЕГЭ!\n"
+        "5. Проходи викторину и получай бонусы!"
     )
 
     keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
@@ -136,7 +193,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает баланс монет"""
     query = update.callback_query
     try:
         await query.answer()
@@ -171,7 +227,6 @@ async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает магазин паков"""
     query = update.callback_query
     try:
         await query.answer()
