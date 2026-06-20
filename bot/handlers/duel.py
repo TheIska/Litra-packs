@@ -23,26 +23,25 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
         user_id = query.from_user.id
-        send_message = query.edit_message_text
         chat_id = query.message.chat_id
     else:
         user_id = update.effective_user.id
-        send_message = update.message.reply_text
         chat_id = update.effective_chat.id
 
     if user_id in user_duel:
-        await send_message("⚠️ У тебя уже есть активная дуэль! Используй /stopduel.")
+        await context.bot.send_message(chat_id, "⚠️ У тебя уже есть активная дуэль! Используй /stopduel.")
         return
 
     collection = get_collection(user_id)
     if len(collection) < 3:
-        await send_message("❌ У тебя меньше 3 героев. Открой паки!")
+        await context.bot.send_message(chat_id, "❌ У тебя меньше 3 героев. Открой паки!")
         return
 
     await show_hero_selection(update, context, user_id, chat_id)
 
 
 async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
+    """Показывает интерфейс выбора героев"""
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
     
@@ -57,13 +56,15 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = []
     row = []
     
-    for i, key in enumerate(hero_keys[:20]):
+    # Показываем героев с кнопками выбора
+    for key in hero_keys[:20]:
         hero = collection[key]
         selected = key in user_selection[user_id]
         emoji = "✅" if selected else "⬜"
+        idx = hero_keys.index(key)
         row.append(InlineKeyboardButton(
             f"{emoji} {hero['name'][:15]}",
-            callback_data=f"select|{key}"
+            callback_data=f"sel|{idx}"
         ))
         if len(row) == 2:
             keyboard.append(row)
@@ -84,6 +85,8 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"_Нажми на героя, чтобы выбрать/отменить_"
     )
     
+    user_selection[f"{user_id}_keys"] = hero_keys
+    
     if update.callback_query:
         await update.callback_query.edit_message_text(
             text,
@@ -100,6 +103,7 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает выбор героев"""
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -107,8 +111,15 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     action = parts[0]
     user_id = query.from_user.id
     
-    if action == "select":
-        hero_key = parts[1]
+    if action == "sel":
+        hero_idx = int(parts[1])
+        
+        hero_keys = user_selection.get(f"{user_id}_keys", [])
+        if not hero_keys or hero_idx >= len(hero_keys):
+            await query.answer("❌ Ошибка! Попробуй заново.", show_alert=True)
+            return
+        
+        hero_key = hero_keys[hero_idx]
         
         if user_id not in user_selection:
             user_selection[user_id] = []
@@ -132,6 +143,7 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Запускает дуэль после выбора героев"""
     collection = get_collection(user_id)
     selected_heroes = user_selection.get(user_id, [])
     
@@ -142,28 +154,19 @@ async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAU
     opponent_id = get_opponent(user_id)
     if not opponent_id:
         user_selection.pop(user_id, None)
-        if update.callback_query:
-            await update.callback_query.edit_message_text("😴 Нет других игроков. Попробуй позже.")
-        else:
-            await context.bot.send_message(user_id, "😴 Нет других игроков. Попробуй позже.")
+        await context.bot.send_message(user_id, "😴 Нет других игроков. Попробуй позже.")
         return
     
     if opponent_id in user_duel:
         user_selection.pop(user_id, None)
-        if update.callback_query:
-            await update.callback_query.edit_message_text("Соперник уже в игре.")
-        else:
-            await context.bot.send_message(user_id, "Соперник уже в игре.")
+        await context.bot.send_message(user_id, "Соперник уже в игре.")
         return
     
     p2_collection = get_collection(opponent_id)
     p2_keys = list(p2_collection.keys())
     if len(p2_keys) < 3:
         user_selection.pop(user_id, None)
-        if update.callback_query:
-            await update.callback_query.edit_message_text("❌ У соперника меньше 3 героев.")
-        else:
-            await context.bot.send_message(user_id, "❌ У соперника меньше 3 героев.")
+        await context.bot.send_message(user_id, "❌ У соперника меньше 3 героев.")
         return
     
     p2_chosen = random.sample(p2_keys, 3)
@@ -210,7 +213,7 @@ async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAU
     
     await context.bot.send_message(
         opponent_id,
-        f"⚔️ *{update.effective_user.first_name if update.effective_user else 'Игрок'} вызвал тебя на дуэль!*\n"
+        f"⚔️ Игрок вызвал тебя на дуэль!\n"
         f"Твои герои: {', '.join(p2_names)}\n"
         f"Всего вопросов: 5\n\n"
         f"За каждый правильный ответ — 1 очко.",
@@ -236,7 +239,6 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     duel["p2_answered"] = False
     duel["waiting_for_answer"] = True
 
-    # БЕЗ ПЕРЕМЕШИВАНИЯ - просто берём вопрос как есть
     question = duel["questions"][q_index]
     p1 = duel["player1"]
     p2 = duel["player2"]
