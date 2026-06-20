@@ -36,7 +36,7 @@ def load_portrait(hero):
         "Иван Тургенев": "turgenev.png",
     }
     
-    filename = portrait_map.get(hero["name"])
+    filename = portrait_map.get(hero.get("name", ""))
     if not filename:
         return None
     
@@ -149,8 +149,9 @@ def draw_vintage_frame(draw, width, height, pal):
     ]
     for x, y in corners:
         for i in range(4):
-            draw.arc([x - i * 6, y - i * 6, x + i * 6, y + i * 6], 0, 90, outline=pal["border"], width=1)
-            draw.arc([x - i * 6 - 2, y - i * 6 - 2, x + i * 6 + 2, y + i * 6 + 2], 0, 90, outline=pal["accent"], width=1)
+            # ИСПРАВЛЕНО: заменяем outline на fill
+            draw.arc([x - i * 6, y - i * 6, x + i * 6, y + i * 6], 0, 90, fill=pal["border"], width=1)
+            draw.arc([x - i * 6 - 2, y - i * 6 - 2, x + i * 6 + 2, y + i * 6 + 2], 0, 90, fill=pal["accent"], width=1)
 
 
 def create_hero_card(hero):
@@ -247,11 +248,15 @@ def create_hero_card(hero):
     if is_legendary:
         portrait = load_portrait(hero)
         if portrait:
+            # Изменяем размер портрета
             portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
-            # Круглая маска
+            
+            # Создаём маску для круга
             mask = Image.new('L', (portrait_size, portrait_size), 0)
             mask_draw = ImageDraw.Draw(mask)
             mask_draw.ellipse((0, 0, portrait_size, portrait_size), fill=255)
+            
+            # Применяем маску
             portrait.putalpha(mask)
             
             x = (width - portrait_size) // 2
@@ -270,13 +275,16 @@ def create_hero_card(hero):
         name_y = 280
 
     # Имя героя (на стилизованной ленте)
-    name = hero["name"]
-    name_bg = Image.new('RGBA', (len(name) * 22 + 40, 50), (pal["name_bg"][0], pal["name_bg"][1], pal["name_bg"][2], 180))
+    name = hero.get("name", "Неизвестный герой")
+    
+    # Создаём ленту для имени
+    name_text_width = len(name) * 22 + 40
+    name_bg = Image.new('RGBA', (name_text_width, 50), (pal["name_bg"][0], pal["name_bg"][1], pal["name_bg"][2], 180))
     name_draw = ImageDraw.Draw(name_bg)
-    name_draw.rectangle([(0, 0), (len(name) * 22 + 40, 50)], outline=pal["border"], width=1)
+    name_draw.rectangle([(0, 0), (name_text_width, 50)], outline=pal["border"], width=1)
     
     # Сохраняем ленту на основное изображение
-    x = (width - (len(name) * 22 + 40)) // 2
+    x = (width - name_text_width) // 2
     img.paste(name_bg, (x, name_y - 10), name_bg)
     
     # Тень для имени
@@ -290,11 +298,12 @@ def create_hero_card(hero):
 
     # Информация о герое
     if is_legendary and portrait:
-        years = get_years(hero.get("author", ""))
+        author = hero.get("author", "")
+        years = get_years(author)
         draw.text((width//2, y), years, fill=pal["sub"], font=font_years, anchor="mt")
         y += 28
         
-        quote = get_random_quote(hero.get("author", ""))
+        quote = get_random_quote(author)
         words = quote.split()
         lines = []
         current_line = ""
@@ -302,7 +311,8 @@ def create_hero_card(hero):
             if len(current_line) + len(word) + 1 <= 32:
                 current_line += word + " "
             else:
-                lines.append(current_line.strip())
+                if current_line:
+                    lines.append(current_line.strip())
                 current_line = word + " "
         if current_line:
             lines.append(current_line.strip())
@@ -317,12 +327,12 @@ def create_hero_card(hero):
         y += len(lines[:3]) * 20 + 30
     else:
         # Для нелегендарных — книга и автор
-        book = hero["book"]
+        book = hero.get("book", hero.get("work", "Неизвестное произведение"))
         if len(book) > 28:
             book = book[:25] + "..."
         draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
         y += 28
-        author = hero["author"]
+        author = hero.get("author", "Неизвестный автор")
         draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
         y += 35
 
@@ -343,7 +353,7 @@ def create_hero_card(hero):
     footer_y = height - 20
     draw.text((width//2, footer_y), "С любовью к литературе", fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 150), font=font_footer, anchor="mt")
 
-    # Сохранение
+    # Сохранение в JPEG
     bio = io.BytesIO()
     img.save(bio, format='JPEG', quality=92, optimize=True)
     bio.seek(0)
