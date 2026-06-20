@@ -162,12 +162,18 @@ def create_hero_card(hero):
     draw = ImageDraw.Draw(img)
 
     # Простая рамка
-    p = 20
+    p = 18
     draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
+    # Заголовок Litra Packs
+    y = 30
+    font_title = load_font(22, "italic")
+    draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
+    y += 10
+
     # Портрет
-    portrait_y = 50
-    portrait_size = 200
+    portrait_y = y + 10
+    portrait_size = 210
     
     if is_legendary:
         portrait = load_portrait(hero)
@@ -186,21 +192,25 @@ def create_hero_card(hero):
             draw.ellipse([(x - 5, portrait_y - 5), (x + portrait_size + 5, portrait_y + portrait_size + 5)], 
                          outline=pal["border"], width=2)
             
-            y = portrait_y + portrait_size + 30
+            y = portrait_y + portrait_size + 25
         else:
-            y = portrait_y + 220
+            y = portrait_y + 230
     else:
-        y = portrait_y + 160
+        y = portrait_y + 170
 
-    # Имя героя (крупно)
+    # Имя героя (очень крупно)
     name = hero.get("name", "Неизвестный герой")
-    font_name = load_font(40, "bold")
+    font_name = load_font(44, "bold")
+    
+    # Тень для чёткости
+    draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
     draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
-    y += 45
+    y += 48
 
     # Информация
-    font_info = load_font(18, "regular")
-    font_small = load_font(16, "italic")
+    font_info = load_font(20, "regular")
+    font_small = load_font(17, "italic")
+    font_quote = load_font(17, "italic")
     
     if is_legendary and portrait:
         author = hero.get("author", "")
@@ -223,10 +233,9 @@ def create_hero_card(hero):
         if current:
             lines.append(current)
         
-        font_quote = load_font(16, "italic")
         for line in lines[:3]:
             draw.text((width//2, y), f'«{line}»', fill=pal["sub"], font=font_quote, anchor="mt")
-            y += 24
+            y += 26
         
         y += 10
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
@@ -236,21 +245,21 @@ def create_hero_card(hero):
         if len(book) > 30:
             book = book[:27] + "..."
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_info, anchor="mt")
-        y += 28
+        y += 30
         
         author = hero.get("author", "Неизвестный автор")
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
         y += 35
 
-    # Редкость (крупно)
+    # Редкость (крупно и чётко)
     labels = {
-        "легендарный": "ЛЕГЕНДАРНЫЙ",
-        "эпический": "ЭПИЧЕСКИЙ",
-        "редкий": "РЕДКИЙ",
-        "обычный": "ОБЫЧНЫЙ"
+        "легендарный": "★ ЛЕГЕНДАРНЫЙ ★",
+        "эпический": "✦ ЭПИЧЕСКИЙ ✦",
+        "редкий": "♦ РЕДКИЙ ♦",
+        "обычный": "• ОБЫЧНЫЙ •"
     }
     rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-    font_rare = load_font(20, "bold")
+    font_rare = load_font(22, "bold")
     
     colors_rare = {
         "легендарный": (200, 160, 80),
@@ -260,20 +269,25 @@ def create_hero_card(hero):
     }
     color = colors_rare.get(rarity, (150, 140, 130))
     
+    # Тень для чёткости
+    draw.text((width//2 + 1, y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
     draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
 
     # Футер
     footer_y = height - 25
-    font_footer = load_font(13, "italic")
+    font_footer = load_font(14, "italic")
     draw.text((width//2, footer_y), "Из собрания литературных героев", 
-             fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 150), 
+             fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 160), 
              font=font_footer, anchor="mt")
     
-    # Чёткость
+    # Повышаем чёткость
     enhancer = ImageEnhance.Sharpness(img)
-    img = enhancer.enhance(1.2)
+    img = enhancer.enhance(1.5)
+    
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.05)
 
     bio = io.BytesIO()
-    img.save(bio, format='JPEG', quality=92, optimize=True)
+    img.save(bio, format='JPEG', quality=95, optimize=True)
     bio.seek(0)
     return bio
