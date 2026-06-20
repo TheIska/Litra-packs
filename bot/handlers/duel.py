@@ -8,7 +8,7 @@ from ..utils.helpers import shuffle_question
 
 duels = {}
 user_duel = {}
-user_selection = {}  # Временное хранилище выбранных героев
+user_selection = {}
 
 BONUSES = {
     "обычный": {"name": "Уверенность", "code": "b1"},
@@ -39,29 +39,24 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_message("❌ У тебя меньше 3 героев. Открой паки!")
         return
 
-    # Показываем выбор героев
     await show_hero_selection(update, context, user_id, chat_id)
 
 
 async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
-    """Показывает интерфейс выбора 3 героев для дуэли"""
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
     
-    # Если героев ровно 3 или меньше — выбираем автоматически
     if len(hero_keys) <= 3:
         user_selection[user_id] = hero_keys.copy()
         await start_duel_after_selection(update, context, user_id)
         return
     
-    # Инициализируем выбор пользователя
     if user_id not in user_selection:
         user_selection[user_id] = []
     
     keyboard = []
     row = []
     
-    # Показываем первых 20 героев с кнопками выбора
     for i, key in enumerate(hero_keys[:20]):
         hero = collection[key]
         selected = key in user_selection[user_id]
@@ -76,7 +71,6 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     if row:
         keyboard.append(row)
     
-    # Кнопка "Начать дуэль"
     keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="start_duel")])
     keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
     
@@ -90,8 +84,8 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"_Нажми на героя, чтобы выбрать/отменить_"
     )
     
-    if query := update.callback_query:
-        await query.edit_message_text(
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
             text,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -106,7 +100,6 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает выбор героев"""
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -128,7 +121,6 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
                 return
             user_selection[user_id].append(hero_key)
         
-        # Обновляем интерфейс выбора
         await show_hero_selection(update, context, user_id, query.message.chat_id)
     
     elif action == "start_duel":
@@ -140,18 +132,15 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """Запускает дуэль после выбора героев"""
     collection = get_collection(user_id)
     selected_heroes = user_selection.get(user_id, [])
     
     if len(selected_heroes) != 3:
-        # Если не 3 героя — возвращаем к выбору
         await show_hero_selection(update, context, user_id, update.effective_chat.id)
         return
     
     opponent_id = get_opponent(user_id)
     if not opponent_id:
-        # Очищаем выбор и сообщаем об ошибке
         user_selection.pop(user_id, None)
         if update.callback_query:
             await update.callback_query.edit_message_text("😴 Нет других игроков. Попробуй позже.")
@@ -177,17 +166,12 @@ async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAU
             await context.bot.send_message(user_id, "❌ У соперника меньше 3 героев.")
         return
     
-    # Соперник тоже выбирает героев (автоматически)
     p2_chosen = random.sample(p2_keys, 3)
     p1_chosen = selected_heroes
     
-    # Сохраняем выбранных героев для использования в дуэли
-    # (они уже сохранены в user_selection, но для дуэли нужно передать)
+    user_selection.pop(user_id, None)
     
     duel_id = f"{user_id}_{opponent_id}_{random.randint(1000,9999)}"
-    
-    # Очищаем выбор пользователя
-    user_selection.pop(user_id, None)
     
     duels[duel_id] = {
         "player1": user_id,
@@ -214,12 +198,6 @@ async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAU
     
     p1_names = [collection[k]['name'] for k in p1_chosen]
     p2_names = [p2_collection[k]['name'] for k in p2_chosen]
-    
-    # Отправляем сообщение о начале дуэли
-    if update.callback_query:
-        send_message = update.callback_query.edit_message_text
-    else:
-        send_message = context.bot.send_message
     
     await context.bot.send_message(
         user_id,
@@ -258,7 +236,8 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     duel["p2_answered"] = False
     duel["waiting_for_answer"] = True
 
-    question = shuffle_question(duel["questions"][q_index])
+    # БЕЗ ПЕРЕМЕШИВАНИЯ - просто берём вопрос как есть
+    question = duel["questions"][q_index]
     p1 = duel["player1"]
     p2 = duel["player2"]
 

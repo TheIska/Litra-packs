@@ -52,7 +52,7 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))
     
-    # ========== ВЫБОР ГЕРОЕВ ДЛЯ ДУЭЛИ ==========
+    # ========== ВЫБОР ГЕРОЕВ ==========
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^select\|"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^start_duel$"))
 

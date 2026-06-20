@@ -6,6 +6,7 @@ from .duel import (
     duel_command,
     answer_callback,
     stop_duel_command,
-    handle_hero_selection  # Добавляем
+    handle_hero_selection,
+    cancel_duel
 )
 from .admin import add_coins_command
