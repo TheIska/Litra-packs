@@ -32,7 +32,7 @@ def init_db():
         )
     ''')
     
-    # Таблица коллекции героев
+    # Таблица коллекции героев с полем card_number
     c.execute('''
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,6 +40,7 @@ def init_db():
             hero_key TEXT,
             hero_data TEXT,
             obtained_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            card_number INTEGER DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(user_id),
             UNIQUE(user_id, hero_key)
         )
@@ -49,11 +50,11 @@ def init_db():
     conn.close()
 
 def migrate_db():
-    """Добавляет недостающие колонки для викторины"""
+    """Добавляет недостающие колонки для викторины и альбома"""
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем существующие колонки
+    # Проверяем колонки users
     c.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -68,6 +69,14 @@ def migrate_db():
     if "daily_quiz_done" not in columns:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
         print("✅ Добавлена колонка daily_quiz_done")
+    
+    # Проверяем колонки collection
+    c.execute("PRAGMA table_info(collection)")
+    collection_columns = [col[1] for col in c.fetchall()]
+    
+    if "card_number" not in collection_columns:
+        c.execute("ALTER TABLE collection ADD COLUMN card_number INTEGER DEFAULT 0")
+        print("✅ Добавлена колонка card_number в collection")
     
     conn.commit()
     conn.close()
@@ -87,6 +96,12 @@ def get_user(user_id: int) -> Dict[str, Any]:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_last_date TEXT")
     if "daily_quiz_done" not in columns:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
+    
+    # Проверяем collection
+    c.execute("PRAGMA table_info(collection)")
+    collection_columns = [col[1] for col in c.fetchall()]
+    if "card_number" not in collection_columns:
+        c.execute("ALTER TABLE collection ADD COLUMN card_number INTEGER DEFAULT 0")
     
     c.execute("""
         SELECT last_free_pack, wins, losses, rating, coins, 
@@ -143,11 +158,13 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     """Возвращает коллекцию героев пользователя"""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT hero_key, hero_data FROM collection WHERE user_id = ?", (user_id,))
+    c.execute("SELECT hero_key, hero_data, card_number FROM collection WHERE user_id = ?", (user_id,))
     rows = c.fetchall()
     result = {}
-    for key, data in rows:
-        result[key] = json.loads(data)
+    for key, data, number in rows:
+        hero = json.loads(data)
+        hero['card_number'] = number or 0
+        result[key] = hero
     conn.close()
     return result
 
@@ -162,6 +179,23 @@ def add_hero_to_collection(user_id: int, hero: Dict) -> None:
     )
     conn.commit()
     conn.close()
+
+def assign_card_number(user_id: int, hero_key: str) -> int:
+    """Присваивает уникальный номер карты"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Получаем следующий номер
+    c.execute("SELECT MAX(card_number) FROM collection WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    next_number = (row[0] or 0) + 1
+    
+    # Обновляем карту с номером
+    c.execute("UPDATE collection SET card_number = ? WHERE user_id = ? AND hero_key = ?", 
+              (next_number, user_id, hero_key))
+    conn.commit()
+    conn.close()
+    return next_number
 
 def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
     """Обновляет время последнего бесплатного пака"""
@@ -313,6 +347,63 @@ def get_heroes_by_rarity(user_id: int) -> Dict[str, int]:
         except:
             pass
     return result
+
+def get_collection_sorted(user_id: int, limit: int = 20, offset: int = 0) -> list:
+    """Получает коллекцию с пагинацией, отсортированную по номеру карты"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Проверяем наличие колонки card_number
+    c.execute("PRAGMA table_info(collection)")
+    columns = [col[1] for col in c.fetchall()]
+    
+    if "card_number" in columns:
+        c.execute("""
+            SELECT hero_key, hero_data, card_number 
+            FROM collection 
+            WHERE user_id = ? 
+            ORDER BY card_number 
+            LIMIT ? OFFSET ?
+        """, (user_id, limit, offset))
+    else:
+        # Если колонки нет - используем id
+        c.execute("""
+            SELECT hero_key, hero_data, id 
+            FROM collection 
+            WHERE user_id = ? 
+            ORDER BY id 
+            LIMIT ? OFFSET ?
+        """, (user_id, limit, offset))
+    
+    rows = c.fetchall()
+    conn.close()
+    
+    result = []
+    for key, data, number in rows:
+        hero = json.loads(data)
+        hero['card_number'] = number or 0
+        hero['hero_key'] = key
+        result.append(hero)
+    return result
+
+def get_card_by_number(user_id: int, number: int) -> Optional[Dict]:
+    """Получает карту по номеру"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    c.execute("""
+        SELECT hero_data, hero_key, card_number 
+        FROM collection 
+        WHERE user_id = ? AND card_number = ?
+    """, (user_id, number))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        hero = json.loads(row[0])
+        hero['card_number'] = row[2] or 0
+        hero['hero_key'] = row[1]
+        return hero
+    return None
 
 def get_daily_quiz_status(user_id: int) -> Dict[str, Any]:
     """Возвращает статус ежедневной викторины"""

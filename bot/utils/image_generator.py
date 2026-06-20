@@ -133,12 +133,13 @@ def draw_stars(draw, x, y, count, color):
 
 
 def create_hero_card(hero):
+    """Создаёт карточку героя с номером"""
     width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
     
-    # Генерируем номер карты (от 1 до 225)
-    card_number = random.randint(1, 225)
+    # Получаем номер карты (если есть)
+    card_number = hero.get('card_number', random.randint(1, 225))
 
     # Цвета
     colors = {
@@ -183,9 +184,9 @@ def create_hero_card(hero):
     draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
     # Номер карты (в правом верхнем углу)
-    font_number = load_font(16, "bold")
+    font_number = load_font(18, "bold")
     number_text = f"№ {card_number:03d}"
-    draw.text((width - 35, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
+    draw.text((width - 30, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
     # Заголовок Litra Packs
     y = 30
@@ -322,3 +323,132 @@ def create_hero_card(hero):
     img.save(bio, format='JPEG', quality=95, optimize=True)
     bio.seek(0)
     return bio
+
+
+# ========== ФУНКЦИИ ДЛЯ АЛЬБОМА ==========
+
+def create_album_page(cards, page, total, cards_per_page):
+    """Создаёт изображение страницы альбома с миниатюрами карт"""
+    # Размеры
+    cols = 4
+    rows = 2
+    card_width = 120
+    card_height = 170
+    spacing = 15
+    padding = 30
+    
+    # Общий размер
+    width = padding * 2 + cols * (card_width + spacing) - spacing
+    height = padding * 2 + rows * (card_height + spacing) - spacing + 60  # +60 для заголовка
+    
+    # Создаём фон
+    img = Image.new('RGB', (width, height), (245, 240, 230))
+    draw = ImageDraw.Draw(img)
+    
+    # Рамка
+    draw.rectangle([(5, 5), (width - 5, height - 5)], outline=(180, 130, 70), width=2)
+    
+    # Заголовок
+    font_title = load_font(20, "bold")
+    total_pages = (total - 1) // cards_per_page + 1
+    draw.text((width//2, 15), f"📚 Альбом • Страница {page + 1}/{total_pages}", 
+             fill=(60, 40, 25), font=font_title, anchor="mt")
+    
+    # Линия под заголовком
+    draw.line([(30, 35), (width - 30, 35)], fill=(180, 130, 70), width=1)
+    
+    # Рисуем карточки
+    y = 50
+    for row in range(rows):
+        x = padding
+        for col in range(cols):
+            idx = row * cols + col
+            if idx < len(cards):
+                card = cards[idx]
+                # Рисуем миниатюру карты
+                draw_mini_card(draw, x, y, card_width, card_height, card)
+            else:
+                # Пустое место для карты
+                draw.rectangle([(x, y), (x + card_width, y + card_height)], 
+                             outline=(200, 195, 185), width=1)
+                draw.text((x + card_width//2, y + card_height//2), "Пусто", 
+                         fill=(200, 195, 185), font=load_font(14), anchor="mt")
+            
+            x += card_width + spacing
+        y += card_height + spacing
+    
+    # Информация внизу
+    font_info = load_font(12, "regular")
+    collected = len(cards)
+    draw.text((width//2, height - 15), f"Собрано: {collected} карт на этой странице", 
+             fill=(130, 120, 110), font=font_info, anchor="mt")
+    
+    bio = io.BytesIO()
+    img.save(bio, format='JPEG', quality=90, optimize=True)
+    bio.seek(0)
+    return bio
+
+
+def draw_mini_card(draw, x, y, width, height, card):
+    """Рисует миниатюру карты для альбома"""
+    # Рамка карты
+    rarity = card.get('rarity', 'обычный')
+    border_color = {
+        "легендарный": (180, 130, 70),
+        "эпический": (140, 105, 155),
+        "редкий": (85, 130, 165),
+        "обычный": (130, 120, 110)
+    }.get(rarity, (130, 120, 110))
+    
+    bg_color = {
+        "легендарный": (240, 232, 215),
+        "эпический": (235, 228, 220),
+        "редкий": (230, 230, 225),
+        "обычный": (225, 222, 215)
+    }.get(rarity, (225, 222, 215))
+    
+    # Фон карты
+    draw.rectangle([(x, y), (x + width, y + height)], fill=bg_color)
+    draw.rectangle([(x, y), (x + width, y + height)], outline=border_color, width=2)
+    
+    # Номер карты
+    number = card.get('card_number', 0)
+    font_small = load_font(10, "bold")
+    draw.text((x + width - 12, y + 5), f"№{number:03d}", 
+             fill=border_color, font=font_small, anchor="rt")
+    
+    # Имя героя
+    name = card.get('name', '')
+    if len(name) > 12:
+        name = name[:10] + '..'
+    font_name = load_font(11, "bold")
+    draw.text((x + width//2, y + height//2 - 5), name, 
+             fill=(60, 40, 25), font=font_name, anchor="mt")
+    
+    # Автор
+    author = card.get('author', '')
+    if len(author) > 12:
+        author = author[:10] + '..'
+    font_author = load_font(9, "regular")
+    draw.text((x + width//2, y + height//2 + 15), author, 
+             fill=(100, 75, 50), font=font_author, anchor="mt")
+    
+    # Редкость (звездочки)
+    stars_count = {
+        "легендарный": 5,
+        "эпический": 4,
+        "редкий": 3,
+        "обычный": 2
+    }.get(rarity, 2)
+    
+    star_color = {
+        "легендарный": (200, 160, 80),
+        "эпический": (160, 120, 170),
+        "редкий": (100, 150, 180),
+        "обычный": (150, 140, 130)
+    }.get(rarity, (150, 140, 130))
+    
+    star_y = y + height - 15
+    for i in range(stars_count):
+        star_x = x + 15 + i * 12
+        draw.text((star_x, star_y), "★", fill=star_color, font=load_font(10))

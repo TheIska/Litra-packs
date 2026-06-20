@@ -1,3 +1,5 @@
+# bot/main.py
+
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
@@ -11,7 +13,12 @@ from .handlers.start import (
     forward_to_admin
 )
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
-from .handlers.collection import show_collection
+from .handlers.collection import (
+    show_collection, 
+    album_navigation, 
+    find_card_by_number,
+    handle_card_number_input
+)
 from .handlers.duel import (
     duel_command,
     answer_callback,
@@ -68,8 +75,10 @@ def main():
     app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
-    # ========== КОЛЛЕКЦИЯ ==========
+    # ========== КОЛЛЕКЦИЯ / АЛЬБОМ ==========
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
+    app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))  # album_prev, album_next, album_goto_
+    app.add_handler(CallbackQueryHandler(find_card_by_number, pattern="^album_find$"))
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
@@ -96,6 +105,9 @@ def main():
 
     # ========== ВИКТОРИНА (ответы) ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
+
+    # ========== ВВОД НОМЕРА КАРТЫ ==========
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_card_number_input))
 
     # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))

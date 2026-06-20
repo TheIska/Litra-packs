@@ -1,9 +1,11 @@
+# bot/handlers/pack.py
+
 import random
 import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
-from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
+from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins, assign_card_number
 from ..models.hero import HEROES
 from ..utils.image_generator import create_hero_card
 
@@ -90,21 +92,30 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     # Выбор героя
     weights = PACK_RARITY_WEIGHTS[pack_type]
     hero = get_hero_by_rarity_weights(weights)
+    
+    # Добавляем героя в коллекцию
     add_hero_to_collection(user_id, hero)
+    
+    # Присваиваем номер карты
+    hero_key = f"{hero['author']} – {hero['name']}"
+    card_number = assign_card_number(user_id, hero_key)
+    hero['card_number'] = card_number  # Добавляем номер в объект героя
+    
     if pack_type == "free":
         update_last_free_pack(user_id, datetime.now())
 
     collection = get_collection(user_id)
     total = len(collection)
 
-    # Генерируем карточку
+    # Генерируем карточку с номером
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
         f"🎉 *Тебе выпал {hero['rarity']} герой!*\n\n"
         f"{emoji} *{hero['name']}*\n"
         f"📖 *{hero['book']}*\n"
-        f"✍️ *{hero['author']}*\n\n"
+        f"✍️ *{hero['author']}*\n"
+        f"🆔 № *{card_number:03d}* в альбоме\n\n"
         f"📊 В коллекции *{total}* героев."
     )
     if pack_type != "free":
