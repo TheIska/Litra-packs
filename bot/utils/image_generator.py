@@ -3,6 +3,7 @@
 import io
 import os
 import random
+import math
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 def load_font(size, style="regular"):
@@ -99,139 +100,106 @@ def get_random_quote(author):
 
 def create_vintage_texture(width, height):
     """Создаёт реалистичную текстуру старой бумаги"""
-    # Базовый цвет бумаги
     img = Image.new('RGB', (width, height), (245, 240, 230))
     draw = ImageDraw.Draw(img)
     
-    # Лёгкий градиент (затемнение к краям)
+    # Лёгкий градиент
     for i in range(height):
         ratio = i / height
-        # Эффект выцветания к центру
-        dark = int(30 * (1 - abs(ratio - 0.5) * 2))
+        dark = int(25 * (1 - abs(ratio - 0.5) * 2))
         draw.line([(0, i), (width, i)], fill=(245 - dark, 240 - dark, 230 - dark))
     
-    # Добавляем текстуру бумаги (шум)
+    # Текстура бумаги
     pixels = img.load()
     for x in range(width):
         for y in range(height):
-            if random.random() < 0.03:
-                noise = random.randint(-15, 15)
+            if random.random() < 0.02:
+                noise = random.randint(-12, 12)
                 r = max(0, min(255, pixels[x, y][0] + noise))
                 g = max(0, min(255, pixels[x, y][1] + noise))
                 b = max(0, min(255, pixels[x, y][2] + noise))
                 pixels[x, y] = (r, g, b)
-    
-    # Добавляем "пятна" как на старой бумаге
-    for _ in range(random.randint(15, 30)):
-        x = random.randint(0, width)
-        y = random.randint(0, height)
-        radius = random.randint(5, 30)
-        color = (random.randint(210, 230), random.randint(200, 220), random.randint(180, 210))
-        mask = Image.new('L', (radius * 2, radius * 2), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.ellipse((0, 0, radius * 2, radius * 2), fill=random.randint(50, 150))
-        img.paste(color, (x - radius, y - radius), mask)
     
     return img
 
 
 def draw_elegant_frame(draw, width, height, pal):
     """Рисует элегантную рамку в стиле XIX века"""
-    # Отступы
-    p = 25
+    p = 20
     
-    # Внешняя рамка (двойная)
+    # Основная рамка
     draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
-    draw.rectangle([(p + 5, p + 5), (width - p - 5, height - p - 5)], outline=pal["border_light"], width=1)
-    draw.rectangle([(p + 10, p + 10), (width - p - 10, height - p - 10)], outline=pal["border"], width=1)
+    draw.rectangle([(p + 6, p + 6), (width - p - 6, height - p - 6)], outline=pal["border_light"], width=1)
+    draw.rectangle([(p + 12, p + 12), (width - p - 12, height - p - 12)], outline=pal["border"], width=1)
     
-    # Декоративные уголки (виньетки)
-    corner_size = 35
+    # Уголки
+    corner_size = 25
     corners = [
-        (p + 10, p + 10, 1, 1),      # левый верхний
-        (width - p - 10, p + 10, -1, 1),  # правый верхний
-        (p + 10, height - p - 10, 1, -1), # левый нижний
-        (width - p - 10, height - p - 10, -1, -1) # правый нижний
+        (p + 12, p + 12, 1, 1),
+        (width - p - 12, p + 12, -1, 1),
+        (p + 12, height - p - 12, 1, -1),
+        (width - p - 12, height - p - 12, -1, -1)
     ]
     
     for cx, cy, dx, dy in corners:
-        # Внешний орнамент
         for i in range(3, 0, -1):
             size = corner_size * i // 3
             draw.arc([cx - size, cy - size, cx + size, cy + size], 
                      0 if dx > 0 else 90, 
                      90 if dy > 0 else 180, 
                      fill=pal["border_light"], width=1)
-        
-        # Внутренний узор (завиток)
-        for j in range(4):
-            angle = j * 90
-            ax = cx + int(12 * dx * (1 if j < 2 else -1))
-            ay = cy + int(12 * dy * (1 if j % 2 == 0 else -1))
-            draw.arc([ax - 8, ay - 8, ax + 8, ay + 8], 
-                     angle, angle + 45, 
-                     fill=pal["accent"], width=1)
 
 
-def draw_ornament_line(draw, x1, y1, x2, y2, pal, style="accent"):
-    """Рисует декоративную линию с узором"""
-    color = pal.get(style, pal["accent"])
+def draw_ornament_line(draw, x1, y1, x2, y2, pal):
+    """Рисует декоративную линию"""
+    draw.line([(x1, y1), (x2, y2)], fill=pal["accent"], width=1)
     
-    # Основная линия
-    draw.line([(x1, y1), (x2, y2)], fill=color, width=1)
-    
-    # Декоративные точки
-    step = 15
-    for x in range(x1 + 10, x2 - 10, step):
+    # Точки на линии
+    step = 12
+    for x in range(x1 + 8, x2 - 8, step):
         y = y1 + (y2 - y1) * (x - x1) // (x2 - x1)
-        draw.ellipse([(x - 2, y - 2), (x + 2, y + 2)], fill=color)
-    
-    # Маленькие ромбики
-    for x in range(x1 + 20, x2 - 20, step * 2):
-        y = y1 + (y2 - y1) * (x - x1) // (x2 - x1)
-        points = [(x, y - 3), (x + 3, y), (x, y + 3), (x - 3, y)]
-        draw.polygon(points, outline=pal["border_light"], width=1)
+        draw.ellipse([(x - 1, y - 1), (x + 1, y + 1)], fill=pal["border"])
 
 
 def draw_hero_name(draw, x, y, name, pal):
-    """Рисует имя героя в стиле старинной книги"""
-    font_name = load_font(36, "bold")
+    """Рисует имя героя"""
+    font_name = load_font(32, "bold")
     
     # Тень
     for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-        draw.text((x + dx, y + dy), name, fill=(0, 0, 0, 50), font=font_name, anchor="mt")
+        draw.text((x + dx, y + dy), name, fill=(0, 0, 0, 40), font=font_name, anchor="mt")
     
-    # Основной текст с градиентом
+    # Основной текст
     draw.text((x, y), name, fill=pal["text"], font=font_name, anchor="mt")
     
-    # Декоративная подчёркивающая линия
+    # Подчёркивание
     try:
         bbox = draw.textbbox((0, 0), name, font=font_name)
         text_width = bbox[2] - bbox[0]
     except:
-        text_width = draw.textlength(name, font=font_name)
+        text_width = len(name) * 18
     
-    line_y = y + 15
+    line_y = y + 14
     draw_ornament_line(draw, x - text_width//2 - 10, line_y, x + text_width//2 + 10, line_y, pal)
 
 
 def draw_quote_style(draw, x, y, quote, pal):
-    """Рисует цитату в красивом оформлении"""
-    font_quote = load_font(16, "italic")
-    font_quote_small = load_font(14, "italic")
+    """Рисует цитату"""
+    font_quote = load_font(15, "italic")
+    font_big = load_font(35, "italic")
     
     # Разбиваем на строки
     words = quote.split()
     lines = []
     current_line = ""
-    max_width = 300
+    max_width = 360
     
     for word in words:
         test_line = current_line + " " + word if current_line else word
         try:
             test_width = draw.textlength(test_line, font=font_quote)
         except:
-            test_width = len(test_line) * 12
+            test_width = len(test_line) * 9
         
         if test_width <= max_width:
             current_line = test_line
@@ -242,49 +210,64 @@ def draw_quote_style(draw, x, y, quote, pal):
     if current_line:
         lines.append(current_line)
     
-    # Большая кавычка
-    big_font = load_font(40, "italic")
-    draw.text((x, y - 5), "«", fill=pal["accent"], font=big_font, anchor="lt")
+    # Открывающая кавычка
+    draw.text((x, y - 2), "«", fill=pal["accent"], font=font_big, anchor="lt")
     
     # Текст
-    line_height = font_quote.size + 6
-    for i, line in enumerate(lines[:3]):
+    line_height = font_quote.size + 4
+    max_lines = min(len(lines), 3)
+    for i in range(max_lines):
         text_y = y + i * line_height
-        # Лёгкая тень
-        draw.text((x + 18 + 1, text_y + 1), line, fill=(0, 0, 0, 30), font=font_quote)
-        draw.text((x + 18, text_y), line, fill=pal["sub"], font=font_quote)
+        draw.text((x + 22, text_y), lines[i], fill=pal["sub"], font=font_quote)
     
     # Закрывающая кавычка
     if lines:
-        last_y = y + (len(lines[:3]) - 1) * line_height
+        last_y = y + (max_lines - 1) * line_height
         try:
-            last_line_width = draw.textlength(lines[-1], font=font_quote)
+            last_width = draw.textlength(lines[max_lines-1], font=font_quote)
         except:
-            last_line_width = len(lines[-1]) * 12
-        draw.text((x + 18 + last_line_width + 5, last_y - 5), "»", fill=pal["accent"], font=big_font, anchor="lt")
+            last_width = len(lines[max_lines-1]) * 9
+        draw.text((x + 22 + last_width + 5, last_y - 2), "»", fill=pal["accent"], font=font_big, anchor="lt")
 
 
 def draw_rarity_badge(draw, x, y, rarity, pal):
-    """Рисует красивый значок редкости"""
+    """Рисует значок редкости внутри ромба"""
     labels = {
-        "легендарный": ("★ ЛЕГЕНДА★", (200, 160, 80)),
-        "эпический": ("✦ ЭПИЧЕСКИЙ ✦", (160, 120, 170)),
-        "редкий": ("♦ РЕДКИЙ ♦", (100, 150, 180)),
-        "обычный": ("• ОБЫЧНЫЙ •", (150, 140, 130))
+        "легендарный": "ЛЕГЕНДАРНЫЙ",
+        "эпический": "ЭПИЧЕСКИЙ",
+        "редкий": "РЕДКИЙ",
+        "обычный": "ОБЫЧНЫЙ"
     }
     
-    text, color = labels.get(rarity, ("ОБЫЧНЫЙ", (150, 140, 130)))
-    font = load_font(14, "bold")
+    colors = {
+        "легендарный": (200, 160, 80),
+        "эпический": (160, 120, 170),
+        "редкий": (100, 150, 180),
+        "обычный": (150, 140, 130)
+    }
     
-    # Ромбовидный фон
-    size = 100
+    text = labels.get(rarity, "ОБЫЧНЫЙ")
+    color = colors.get(rarity, (150, 140, 130))
+    font = load_font(13, "bold")
+    
+    # Ромб
+    size = 80
     points = [
-        (x, y - 15),
+        (x, y - 18),
         (x + size//2, y),
-        (x, y + 15),
+        (x, y + 18),
         (x - size//2, y)
     ]
-    draw.polygon(points, outline=pal["border"], fill=(255, 255, 255, 180), width=1)
+    draw.polygon(points, outline=pal["border"], fill=(255, 255, 255, 200), width=1)
+    
+    # Внутренний ромб
+    points2 = [
+        (x, y - 12),
+        (x + size//2 - 10, y),
+        (x, y + 12),
+        (x - size//2 + 10, y)
+    ]
+    draw.polygon(points2, outline=pal["border_light"], width=1)
     
     # Текст
     draw.text((x, y), text, fill=color, font=font, anchor="mt")
@@ -292,19 +275,10 @@ def draw_rarity_badge(draw, x, y, rarity, pal):
 
 def draw_vintage_ornament(draw, x, y, pal):
     """Рисует декоративный орнамент"""
-    # Центральный узор
-    for i in range(10, 0, -2):
-        size = i * 3
+    for i in range(8, 0, -2):
+        size = i * 2
         draw.arc([x - size, y - size//2, x + size, y + size//2], 
                 180, 360, fill=pal["border_light"], width=1)
-    
-    # Маленькие звёздочки
-    for angle in [0, 45, 90, 135, 180, 225, 270, 315]:
-        import math
-        rad = math.radians(angle)
-        dx = int(20 * math.cos(rad))
-        dy = int(10 * math.sin(rad))
-        draw.point((x + dx, y + dy), fill=pal["accent"])
 
 
 def create_hero_card(hero):
@@ -312,7 +286,7 @@ def create_hero_card(hero):
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
 
-    # Улучшенные цветовые палитры
+    # Цветовые палитры
     colors = {
         "легендарный": {
             "bg": (240, 232, 215),
@@ -320,8 +294,7 @@ def create_hero_card(hero):
             "border_light": (200, 170, 120),
             "accent": (200, 150, 70),
             "text": (60, 40, 25),
-            "sub": (100, 75, 50),
-            "shadow": (80, 60, 40)
+            "sub": (100, 75, 50)
         },
         "эпический": {
             "bg": (235, 228, 220),
@@ -329,8 +302,7 @@ def create_hero_card(hero):
             "border_light": (175, 150, 185),
             "accent": (160, 120, 170),
             "text": (55, 40, 65),
-            "sub": (95, 75, 105),
-            "shadow": (70, 55, 80)
+            "sub": (95, 75, 105)
         },
         "редкий": {
             "bg": (230, 230, 225),
@@ -338,8 +310,7 @@ def create_hero_card(hero):
             "border_light": (140, 175, 200),
             "accent": (95, 145, 175),
             "text": (40, 50, 65),
-            "sub": (75, 95, 115),
-            "shadow": (50, 65, 80)
+            "sub": (75, 95, 115)
         },
         "обычный": {
             "bg": (225, 222, 215),
@@ -347,26 +318,25 @@ def create_hero_card(hero):
             "border_light": (175, 165, 155),
             "accent": (155, 145, 135),
             "text": (55, 50, 45),
-            "sub": (95, 85, 75),
-            "shadow": (70, 65, 60)
+            "sub": (95, 85, 75)
         }
     }
 
     pal = colors.get(rarity, colors["обычный"])
 
-    # Создаём текстурированный фон
+    # Создаём фон
     img = create_vintage_texture(width, height)
     draw = ImageDraw.Draw(img)
 
     # Рамка
     draw_elegant_frame(draw, width, height, pal)
 
-    # Верхний заголовок
-    y = 45
-    font_title = load_font(16, "italic")
-    title_text = "✦ Литературный Герой ✦"
+    # Заголовок
+    y = 40
+    font_title = load_font(18, "italic")
+    title_text = "✦ Litra Packs ✦"
     draw.text((width//2, y), title_text, fill=pal["accent"], font=font_title, anchor="mt")
-    y += 15
+    y += 18
     
     # Декоративная линия
     draw_ornament_line(draw, 60, y, width - 60, y, pal)
@@ -381,109 +351,87 @@ def create_hero_card(hero):
         if portrait:
             portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
             
-            # Создаём маску для круга с мягким краем
+            # Маска для круга
             mask = Image.new('L', (portrait_size, portrait_size), 0)
             mask_draw = ImageDraw.Draw(mask)
-            for i in range(portrait_size // 2):
-                r = portrait_size // 2 - i
-                mask_draw.ellipse((i, i, portrait_size - i, portrait_size - i), 
-                                 fill=int(255 * (1 - i / (portrait_size // 2) * 0.3)))
+            mask_draw.ellipse((2, 2, portrait_size - 2, portrait_size - 2), fill=255)
             
             portrait.putalpha(mask)
             
             x = (width - portrait_size) // 2
-            # Добавляем тень
-            shadow = Image.new('RGBA', (portrait_size + 20, portrait_size + 20), (0, 0, 0, 0))
-            shadow_draw = ImageDraw.Draw(shadow)
-            shadow_draw.ellipse((10, 10, portrait_size + 10, portrait_size + 10), fill=(0, 0, 0, 50))
-            img.paste(shadow, (x - 10, portrait_y - 10), shadow)
-            
             img.paste(portrait, (x, portrait_y), portrait)
             
-            # Элегантная рамка вокруг портрета
-            draw.ellipse([(x - 8, portrait_y - 8), (x + portrait_size + 8, portrait_y + portrait_size + 8)], 
+            # Рамка вокруг портрета
+            draw.ellipse([(x - 6, portrait_y - 6), (x + portrait_size + 6, portrait_y + portrait_size + 6)], 
                          outline=pal["border"], width=2)
-            draw.ellipse([(x - 4, portrait_y - 4), (x + portrait_size + 4, portrait_y + portrait_size + 4)], 
+            draw.ellipse([(x - 3, portrait_y - 3), (x + portrait_size + 3, portrait_y + portrait_size + 3)], 
                          outline=pal["accent"], width=1)
             
-            # Орнамент вокруг портрета
-            for angle in range(0, 360, 45):
-                import math
-                rad = math.radians(angle)
-                ox = x + portrait_size//2 + int((portrait_size//2 + 15) * math.cos(rad))
-                oy = portrait_y + portrait_size//2 + int((portrait_size//2 + 15) * math.sin(rad))
-                draw.ellipse([(ox - 3, oy - 3), (ox + 3, oy + 3)], fill=pal["accent"])
-            
-            y = portrait_y + portrait_size + 35
+            y = portrait_y + portrait_size + 30
         else:
-            y = portrait_y + 200
+            y = portrait_y + 190
     else:
         y = portrait_y + 120
 
     # Имя героя
     name = hero.get("name", "Неизвестный герой")
     draw_hero_name(draw, width//2, y, name, pal)
-    y += 35
+    y += 32
 
     # Информация
     font_info = load_font(15, "regular")
     font_info_small = load_font(13, "italic")
     
     if is_legendary and portrait:
-        # Годы жизни
         author = hero.get("author", "")
         years = get_years(author)
         draw.text((width//2, y), years, fill=pal["sub"], font=font_info_small, anchor="mt")
-        y += 25
+        y += 22
         
-        # Цитата
         quote = get_random_quote(author)
-        draw_quote_style(draw, 50, y, quote, pal)
+        draw_quote_style(draw, 45, y, quote, pal)
         y += 100
         
-        # Автор внизу
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_info_small, anchor="mt")
-        y += 35
+        y += 32
     else:
-        # Произведение
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
         if len(book) > 30:
             book = book[:27] + "..."
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_info, anchor="mt")
-        y += 25
+        y += 24
         
-        # Автор
         author = hero.get("author", "Неизвестный автор")
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_info_small, anchor="mt")
-        y += 30
+        y += 28
 
-    # Декоративная линия перед редкостью
+    # Декоративная линия
     draw_ornament_line(draw, 60, y, width - 60, y, pal)
-    y += 25
+    y += 22
 
-    # Редкость
+    # Редкость (в ромбе)
     draw_rarity_badge(draw, width//2, y, rarity, pal)
     y += 35
 
     # Футер
-    footer_y = height - 25
+    footer_y = height - 22
     font_footer = load_font(11, "italic")
     draw.text((width//2, footer_y), "❧ Из собрания литературных героев ❧", 
              fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 180), 
              font=font_footer, anchor="mt")
     
-    # Добавляем небольшое винтажное размытие
-    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+    # Лёгкое размытие для винтажного эффекта (очень слабое)
+    img = img.filter(ImageFilter.GaussianBlur(radius=0.3))
     
-    # Улучшаем контраст для более "старинного" вида
+    # Повышаем чёткость
+    enhancer = ImageEnhance.Sharpness(img)
+    img = enhancer.enhance(1.3)
+    
     enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(1.1)
-    
-    enhancer = ImageEnhance.Color(img)
-    img = enhancer.enhance(0.9)
+    img = enhancer.enhance(1.05)
 
     # Сохранение
     bio = io.BytesIO()
-    img.save(bio, format='JPEG', quality=92, optimize=True)
+    img.save(bio, format='JPEG', quality=95, optimize=True)
     bio.seek(0)
     return bio
