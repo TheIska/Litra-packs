@@ -3,6 +3,7 @@
 import io
 import os
 import random
+import math
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 def load_font(size, style="regular"):
@@ -118,23 +119,17 @@ def create_vintage_texture(width, height):
     return img
 
 
-def draw_decorative_line(draw, x1, y1, x2, y2, color):
-    """Рисует тонкую декоративную линию с точкой посередине"""
-    draw.line([(x1, y1), (x2, y2)], fill=color, width=1)
-    mid_x = (x1 + x2) // 2
-    draw.ellipse([(mid_x - 3, y1 - 3), (mid_x + 3, y1 + 3)], fill=color)
-
-
-def draw_stars(draw, x, y, count, color, size=3):
+def draw_stars(draw, x, y, count, color):
     """Рисует звёздочки для редкости"""
     for i in range(count):
-        star_x = x - (count - 1) * 8 + i * 16
-        # Маленькая звёздочка (4 точки)
-        for angle in range(0, 360, 90):
+        star_x = x - (count - 1) * 14 + i * 28
+        # Рисуем 5-конечную звезду
+        for angle in range(0, 360, 72):
             rad = math.radians(angle)
-            dx = int(size * math.cos(rad))
-            dy = int(size * math.sin(rad))
+            dx = int(8 * math.cos(rad))
+            dy = int(8 * math.sin(rad))
             draw.point((star_x + dx, y + dy), fill=color)
+        draw.point((star_x, y), fill=color)
 
 
 def create_hero_card(hero):
@@ -142,9 +137,8 @@ def create_hero_card(hero):
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
     
-    # Генерируем номер карты (от 1 до 999)
-    import random as rnd
-    card_number = rnd.randint(1, 225)
+    # Генерируем номер карты (от 1 до 225)
+    card_number = random.randint(1, 225)
 
     # Цвета
     colors = {
@@ -153,32 +147,28 @@ def create_hero_card(hero):
             "border": (180, 130, 70),
             "accent": (200, 150, 70),
             "text": (60, 40, 25),
-            "sub": (100, 75, 50),
-            "stars": (200, 160, 80)
+            "sub": (100, 75, 50)
         },
         "эпический": {
             "bg": (235, 228, 220),
             "border": (140, 105, 155),
             "accent": (160, 120, 170),
             "text": (55, 40, 65),
-            "sub": (95, 75, 105),
-            "stars": (160, 120, 170)
+            "sub": (95, 75, 105)
         },
         "редкий": {
             "bg": (230, 230, 225),
             "border": (85, 130, 165),
             "accent": (95, 145, 175),
             "text": (40, 50, 65),
-            "sub": (75, 95, 115),
-            "stars": (100, 150, 180)
+            "sub": (75, 95, 115)
         },
         "обычный": {
             "bg": (225, 222, 215),
             "border": (130, 120, 110),
             "accent": (155, 145, 135),
             "text": (55, 50, 45),
-            "sub": (95, 85, 75),
-            "stars": (150, 140, 130)
+            "sub": (95, 85, 75)
         }
     }
 
@@ -197,16 +187,11 @@ def create_hero_card(hero):
     number_text = f"№ {card_number:03d}"
     draw.text((width - 35, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-    # Заголовок Litra Packs (без квадратика)
+    # Заголовок Litra Packs
     y = 30
     font_title = load_font(20, "italic")
     draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
-    y += 10
-
-    # Декоративная линия под заголовком
-    y += 5
-    draw_decorative_line(draw, 40, y, width - 40, y, pal["border"])
-    y += 15
+    y += 20
 
     # Портрет
     portrait_y = y + 5
@@ -243,10 +228,6 @@ def create_hero_card(hero):
     draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
     draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
     y += 48
-
-    # Декоративная линия под именем
-    draw_decorative_line(draw, 60, y - 10, width - 60, y - 10, pal["border_light"])
-    y += 5
 
     # Информация
     font_info = load_font(20, "regular")
@@ -292,7 +273,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
         y += 35
 
-    # Редкость (без квадратика, только текст)
+    # Редкость со звёздами
     labels = {
         "легендарный": "ЛЕГЕНДАРНЫЙ",
         "эпический": "ЭПИЧЕСКИЙ",
@@ -316,23 +297,12 @@ def create_hero_card(hero):
     
     # Рисуем звёздочки над текстом
     star_y = y - 5
-    for i in range(stars):
-        star_x = width//2 - (stars - 1) * 12 + i * 24
-        # Рисуем звёздочку
-        for angle in range(0, 360, 72):
-            rad = math.radians(angle)
-            dx = int(6 * math.cos(rad))
-            dy = int(6 * math.sin(rad))
-            draw.point((star_x + dx, star_y + dy), fill=color)
-        draw.point((star_x, star_y), fill=color)
+    draw_stars(draw, width//2, star_y, stars, color)
     
     # Текст редкости (с тенью для чёткости)
     draw.text((width//2 + 1, y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
     draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
-    y += 35
-
-    # Декоративная линия перед футером
-    draw_decorative_line(draw, 60, y, width - 60, y, pal["border"])
+    y += 40
 
     # Футер
     footer_y = height - 25
