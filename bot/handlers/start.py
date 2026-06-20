@@ -83,9 +83,8 @@ async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = (
         "📩 Сообщить об ошибке\n\n"
-        "Если ты нашёл ошибку в боте или хочешь предложить идею, напиши мне напрямую:\n\n"
-        "👤 Разработчик: @your_username\n\n"
-        "Или просто отправь сообщение с описанием проблемы — я увижу!"
+        "Если ты нашёл ошибку в боте или хочешь предложить идею, просто отправь сообщение с описанием проблемы.\n\n"
+        "Спасибо за обратную связь!"
     )
     
     keyboard = [
@@ -104,13 +103,11 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         user_name = user.first_name or "Пользователь"
         user_id = user.id
-        username = f"@{user.username}" if user.username else "без username"
         
         message_text = (
             f"📩 Новое сообщение от пользователя\n\n"
             f"👤 Имя: {user_name}\n"
-            f"🆔 ID: {user_id}\n"
-            f"🔗 {username}\n\n"
+            f"🆔 ID: {user_id}\n\n"
             f"📝 Сообщение:\n{update.message.text}"
         )
         
