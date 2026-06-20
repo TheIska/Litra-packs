@@ -1,3 +1,5 @@
+i# bot/handlers/quiz.py
+
 import random
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -7,28 +9,26 @@ from ..database import get_user, update_user, add_coins
 from ..models.questions import QUESTIONS
 from ..utils.helpers import shuffle_question, extract_work
 
-# Хранилище активных викторин
 active_quizzes = {}
-
-# Московское время (UTC+3)
 MOSCOW_TZ = timezone(timedelta(hours=3))
 
 def get_moscow_date():
-    """Возвращает текущую дату по МСК"""
     return datetime.now(MOSCOW_TZ).date()
 
 def get_daily_bonus(streak: int) -> int:
-    """Возвращает бонус за день в зависимости от streak"""
     if streak >= 6:
         return 100
     return 50 + (streak - 1) * 10
 
 
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Запускает ежедневную викторину"""
+    print("🔄 quiz_command вызван!")  # Отладочный вывод
     query = update.callback_query
     if query:
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            pass
         user_id = query.from_user.id
         chat_id = query.message.chat_id
     else:
@@ -38,7 +38,6 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     today = get_moscow_date()
     
-    # Проверяем, была ли викторина сегодня
     if user.get("daily_quiz_last_date"):
         last_date = datetime.fromisoformat(user["daily_quiz_last_date"]).date()
         if last_date == today:
@@ -55,15 +54,12 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
     
-    # Проверяем серию
     if user.get("daily_quiz_last_date"):
         last_date = datetime.fromisoformat(user["daily_quiz_last_date"]).date()
         if last_date < today - timedelta(days=1):
-            # Пропустил день — сбрасываем серию
             update_user(user_id, daily_quiz_streak=0)
             user["daily_quiz_streak"] = 0
     
-    # Создаём викторину
     questions = random.sample(QUESTIONS, 5)
     quiz_id = f"quiz_{user_id}_{int(datetime.now().timestamp())}"
     
@@ -79,7 +75,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_quiz_question(update, context, quiz_id)
 
 
-async def show_quiz_question(update: Update, context: ContextTypes.DEFAULT_TYPE, quiz_id: str):
+async def show_quiz_question(update, context, quiz_id):
     quiz = active_quizzes.get(quiz_id)
     if not quiz:
         return
@@ -89,7 +85,6 @@ async def show_quiz_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
     questions = quiz["questions"]
     
     if q_index >= len(questions):
-        # Викторина завершена
         await finish_quiz(update, context, quiz_id)
         return
     
@@ -182,7 +177,7 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await show_quiz_question(update, context, quiz_id)
 
 
-async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, quiz_id: str):
+async def finish_quiz(update, context, quiz_id):
     quiz = active_quizzes.pop(quiz_id, None)
     if not quiz:
         return
@@ -195,7 +190,6 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, quiz_i
     today = get_moscow_date()
     
     if correct >= 5:
-        # Все ответы правильные — начисляем бонус
         new_streak = streak + 1
         add_coins(user_id, bonus)
         update_user(
@@ -215,7 +209,6 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, quiz_i
             parse_mode="Markdown"
         )
     else:
-        # Не все ответы правильные
         update_user(
             user_id,
             daily_quiz_last_date=today.isoformat(),
