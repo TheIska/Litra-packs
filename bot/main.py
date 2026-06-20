@@ -48,13 +48,14 @@ def main():
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^a\|"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))
     
     # ========== ВЫБОР ГЕРОЕВ ==========
-    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^select\|"))
-    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^start_duel$"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hero\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^startduel$"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
 
     print("🤖 Бот запущен!")
     app.run_polling()

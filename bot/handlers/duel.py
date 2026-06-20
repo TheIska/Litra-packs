@@ -54,25 +54,18 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_selection[user_id] = []
     
     keyboard = []
-    row = []
     
-    # Показываем героев с кнопками выбора
-    for key in hero_keys[:20]:
+    # Создаём кнопки с номерами (1-20)
+    for i, key in enumerate(hero_keys[:20], 1):
         hero = collection[key]
         selected = key in user_selection[user_id]
         emoji = "✅" if selected else "⬜"
-        idx = hero_keys.index(key)
-        row.append(InlineKeyboardButton(
-            f"{emoji} {hero['name'][:15]}",
-            callback_data=f"sel|{idx}"
-        ))
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
+        keyboard.append([InlineKeyboardButton(
+            f"{i}. {emoji} {hero['name'][:20]}",
+            callback_data=f"hero{i}"  # hero1, hero2, ...
+        )])
     
-    keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="start_duel")])
+    keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="startduel")])
     keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
     
     selected_count = len(user_selection.get(user_id, []))
@@ -85,6 +78,7 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"_Нажми на героя, чтобы выбрать/отменить_"
     )
     
+    # Сохраняем список героев
     user_selection[f"{user_id}_keys"] = hero_keys
     
     if update.callback_query:
@@ -107,19 +101,22 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     data = query.data
-    parts = data.split("|")
-    action = parts[0]
     user_id = query.from_user.id
     
-    if action == "sel":
-        hero_idx = int(parts[1])
+    # hero1, hero2, ... hero20
+    if data.startswith("hero"):
+        try:
+            hero_num = int(data.replace("hero", "")) - 1
+        except ValueError:
+            await query.answer("❌ Ошибка!", show_alert=True)
+            return
         
         hero_keys = user_selection.get(f"{user_id}_keys", [])
-        if not hero_keys or hero_idx >= len(hero_keys):
+        if not hero_keys or hero_num >= len(hero_keys) or hero_num < 0:
             await query.answer("❌ Ошибка! Попробуй заново.", show_alert=True)
             return
         
-        hero_key = hero_keys[hero_idx]
+        hero_key = hero_keys[hero_num]
         
         if user_id not in user_selection:
             user_selection[user_id] = []
@@ -134,12 +131,18 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
         
         await show_hero_selection(update, context, user_id, query.message.chat_id)
     
-    elif action == "start_duel":
+    elif data == "startduel":
         if user_id not in user_selection or len(user_selection[user_id]) != 3:
             await query.answer("❌ Выбери ровно 3 героев!", show_alert=True)
             return
         
         await start_duel_after_selection(update, context, user_id)
+    
+    elif data == "main_menu":
+        user_selection.pop(user_id, None)
+        user_selection.pop(f"{user_id}_keys", None)
+        from .start import start
+        await start(update, context)
 
 
 async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -251,7 +254,7 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
 
     keyboard = []
     for idx, option in enumerate(question["options"]):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f"a|{duel_id}|{idx}")])
+        keyboard.append([InlineKeyboardButton(option, callback_data=f"ans|{duel_id}|{idx}")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -301,10 +304,9 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    parts = data.split("|")
-    action = parts[0]
-
-    if action == "a":
+    
+    if data.startswith("ans|"):
+        parts = data.split("|")
         duel_id = parts[1]
         answer_idx = int(parts[2])
 
@@ -382,8 +384,9 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     player_id_other,
                     f"🔔 Соперник ответил неправильно! Твой ход!"
                 )
-
-    elif action == "b":
+    
+    elif data.startswith("b|"):
+        parts = data.split("|")
         duel_id = parts[1]
         player_id = int(parts[2])
         bonus_code = parts[3]
@@ -433,7 +436,8 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(f"🔍 Бонус активирован!")
 
-    elif action == "s":
+    elif data.startswith("s|"):
+        parts = data.split("|")
         duel_id = parts[1]
         player_id = int(parts[2])
 
