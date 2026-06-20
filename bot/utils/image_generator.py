@@ -3,7 +3,7 @@
 import io
 import os
 import random
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 def load_font(size, style="regular"):
     """Загружает шрифт из папки static/fonts"""
@@ -44,19 +44,6 @@ def load_portrait(hero):
     if os.path.exists(portrait_path):
         try:
             return Image.open(portrait_path).convert("RGBA")
-        except:
-            return None
-    return None
-
-
-def load_logo():
-    """Загружает логотип бота"""
-    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo.png')
-    if os.path.exists(logo_path):
-        try:
-            logo = Image.open(logo_path).convert("RGBA")
-            logo.thumbnail((50, 50), Image.Resampling.LANCZOS)
-            return logo
         except:
             return None
     return None
@@ -132,11 +119,11 @@ def create_vintage_texture(width, height):
 
 
 def create_hero_card(hero):
-    width, height = 450, 600
+    width, height = 500, 700
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
 
-    # Минимальные цвета
+    # Цвета
     colors = {
         "легендарный": {
             "bg": (240, 232, 215),
@@ -175,27 +162,12 @@ def create_hero_card(hero):
     draw = ImageDraw.Draw(img)
 
     # Простая рамка
-    p = 15
+    p = 20
     draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
-    draw.rectangle([(p + 5, p + 5), (width - p - 5, height - p - 5)], outline=pal["border"], width=1)
-
-    # Заголовок
-    y = 30
-    font_title = load_font(16, "italic")
-    draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
-    y += 20
-
-    # Логотип (если есть)
-    logo = load_logo()
-    if logo:
-        logo_x = 25
-        logo_y = 25
-        img.paste(logo, (logo_x, logo_y), logo)
-        y = 55
 
     # Портрет
-    portrait_y = y + 10
-    portrait_size = 150
+    portrait_y = 50
+    portrait_size = 200
     
     if is_legendary:
         portrait = load_portrait(hero)
@@ -210,30 +182,31 @@ def create_hero_card(hero):
             x = (width - portrait_size) // 2
             img.paste(portrait, (x, portrait_y), portrait)
             
-            draw.ellipse([(x - 4, portrait_y - 4), (x + portrait_size + 4, portrait_y + portrait_size + 4)], 
+            # Рамка вокруг портрета
+            draw.ellipse([(x - 5, portrait_y - 5), (x + portrait_size + 5, portrait_y + portrait_size + 5)], 
                          outline=pal["border"], width=2)
             
-            y = portrait_y + portrait_size + 20
+            y = portrait_y + portrait_size + 30
         else:
-            y = portrait_y + 170
+            y = portrait_y + 220
     else:
-        y = portrait_y + 120
+        y = portrait_y + 160
 
-    # Имя героя
+    # Имя героя (крупно)
     name = hero.get("name", "Неизвестный герой")
-    font_name = load_font(28, "bold")
+    font_name = load_font(40, "bold")
     draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
-    y += 30
+    y += 45
 
     # Информация
-    font_info = load_font(14, "regular")
-    font_small = load_font(12, "italic")
+    font_info = load_font(18, "regular")
+    font_small = load_font(16, "italic")
     
     if is_legendary and portrait:
         author = hero.get("author", "")
         years = get_years(author)
         draw.text((width//2, y), years, fill=pal["sub"], font=font_small, anchor="mt")
-        y += 20
+        y += 28
         
         quote = get_random_quote(author)
         # Разбиваем цитату на строки
@@ -241,7 +214,7 @@ def create_hero_card(hero):
         lines = []
         current = ""
         for word in words:
-            if len(current + " " + word) <= 25:
+            if len(current + " " + word) <= 30:
                 current += " " + word if current else word
             else:
                 if current:
@@ -250,34 +223,34 @@ def create_hero_card(hero):
         if current:
             lines.append(current)
         
-        font_quote = load_font(13, "italic")
-        for line in lines[:2]:
+        font_quote = load_font(16, "italic")
+        for line in lines[:3]:
             draw.text((width//2, y), f'«{line}»', fill=pal["sub"], font=font_quote, anchor="mt")
-            y += 20
+            y += 24
         
         y += 10
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
-        y += 30
+        y += 40
     else:
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
-        if len(book) > 25:
-            book = book[:22] + "..."
+        if len(book) > 30:
+            book = book[:27] + "..."
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_info, anchor="mt")
-        y += 22
+        y += 28
         
         author = hero.get("author", "Неизвестный автор")
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
-        y += 25
+        y += 35
 
-    # Редкость
+    # Редкость (крупно)
     labels = {
-        "легендарный": "★ ЛЕГЕНДАРНЫЙ ★",
-        "эпический": "✧ ЭПИЧЕСКИЙ ✧",
-        "редкий": "♦ РЕДКИЙ ♦",
-        "обычный": "• ОБЫЧНЫЙ •"
+        "легендарный": "ЛЕГЕНДАРНЫЙ",
+        "эпический": "ЭПИЧЕСКИЙ",
+        "редкий": "РЕДКИЙ",
+        "обычный": "ОБЫЧНЫЙ"
     }
     rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-    font_rare = load_font(14, "bold")
+    font_rare = load_font(20, "bold")
     
     colors_rare = {
         "легендарный": (200, 160, 80),
@@ -290,8 +263,8 @@ def create_hero_card(hero):
     draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
 
     # Футер
-    footer_y = height - 20
-    font_footer = load_font(10, "italic")
+    footer_y = height - 25
+    font_footer = load_font(13, "italic")
     draw.text((width//2, footer_y), "Из собрания литературных героев", 
              fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 150), 
              font=font_footer, anchor="mt")
