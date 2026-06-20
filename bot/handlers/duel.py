@@ -5,7 +5,6 @@ from telegram.ext import ContextTypes
 from ..database import get_collection, get_user, update_duel_stats, get_opponent
 from ..models.questions import QUESTIONS
 from ..utils.helpers import shuffle_question
-from ..utils.ai_helper import get_explanation
 
 duels = {}
 user_duel = {}
@@ -169,26 +168,13 @@ async def send_correct_answer_and_continue(update: Update, context: ContextTypes
 
     p1 = duel["player1"]
     p2 = duel["player2"]
-    
-    loading_msg = "⏳ _Генерирую пояснение..._"
-    await context.bot.send_message(p1, loading_msg, parse_mode="Markdown")
-    await context.bot.send_message(p2, loading_msg, parse_mode="Markdown")
 
-    explanation = await get_explanation(
-        question_text=question["text"],
-        correct_answer=correct_text,
-        options=question["options"]
-    )
-
-    message_text = (
-        f"✅ *Правильный ответ:* {correct_text}\n\n"
-        f"📚 *Пояснение:*\n{explanation}"
-    )
+    message_text = f"✅ *Правильный ответ:* {correct_text}"
 
     await context.bot.send_message(p1, message_text, parse_mode="Markdown")
     await context.bot.send_message(p2, message_text, parse_mode="Markdown")
 
-    await asyncio.sleep(2.5)
+    await asyncio.sleep(2)
     duel["turn"] += 1
     await ask_question(update, context, duel_id)
 
