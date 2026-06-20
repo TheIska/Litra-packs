@@ -32,7 +32,7 @@ logging.basicConfig(
 
 def main():
     init_db()
-    migrate_db()  # <-- Добавить эту строку!
+    migrate_db()
     keep_alive()
 
     app = Application.builder().token(BOT_TOKEN).build()
@@ -50,12 +50,18 @@ def main():
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
     app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
+    
+    # ========== ПОМОЩЬ ==========
+    app.add_handler(CallbackQueryHandler(help_command, pattern="^help$"))
+
+    # ========== ВИКТОРИНА ==========
+    app.add_handler(CallbackQueryHandler(quiz_command, pattern="^quiz$"))
 
     # ========== ПАКИ ==========
     app.add_handler(CallbackQueryHandler(free_pack, pattern="^free_pack$"))
     app.add_handler(CallbackQueryHandler(small_pack, pattern="^small_pack$"))
     app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
-    app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
+   app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
     # ========== КОЛЛЕКЦИЯ ==========
     app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
@@ -83,7 +89,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
 
-    # ========== ВИКТОРИНА ==========
+    # ========== ВИКТОРИНА (ответы) ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
 
     print("🤖 Бот запущен!")
