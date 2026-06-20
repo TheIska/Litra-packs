@@ -8,7 +8,8 @@ from .handlers.collection import show_collection
 from .handlers.duel import (
     duel_command,
     answer_callback,
-    stop_duel_command
+    stop_duel_command,
+    handle_hero_selection
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -50,6 +51,10 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^a\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))
+    
+    # ========== ВЫБОР ГЕРОЕВ ДЛЯ ДУЭЛИ ==========
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^select\|"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^start_duel$"))
 
     print("🤖 Бот запущен!")
     app.run_polling()
