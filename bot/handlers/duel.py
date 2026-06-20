@@ -13,6 +13,7 @@ duels = {}
 user_duel = {}
 user_selection = {}
 invite_codes = {}
+searching_players = set()  # Игроки, которые ищут случайного соперника
 
 BONUSES = {
     "обычный": {"name": "Уверенность", "code": "b1"},
@@ -29,10 +30,10 @@ SAVE_CHANCES = {
 }
 
 WORK_MULTIPLIERS = {
-    "легендарный": 3,
-    "эпический": 2,
-    "редкий": 1.5,
-    "обычный": 1,
+    "легендарный": 10,
+    "эпический": 4,
+    "редкий": 3,
+    "обычный": 2,
 }
 
 
@@ -48,6 +49,7 @@ def get_bot_name() -> str:
 
 
 def get_weighted_questions(selected_heroes, collection, all_questions, count=5):
+    """Выбирает вопросы с учётом бонусов от выбранных героев"""
     work_weights = defaultdict(int)
     for key in selected_heroes:
         hero = collection[key]
@@ -277,9 +279,75 @@ async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duel_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запускает поиск случайного соперника"""
     query = update.callback_query
     await query.answer()
-    await show_hero_selection_for_duel(update, context, query.from_user.id, query.message.chat_id, "random")
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+
+    # Проверяем, есть ли уже игрок в очереди поиска
+    if user_id in searching_players:
+        await context.bot.send_message(chat_id, "⏳ Ты уже в поиске соперника...")
+        return
+
+    if user_id in user_duel:
+        await context.bot.send_message(chat_id, "⚠️ У тебя уже есть активная дуэль!")
+        return
+
+    # Добавляем игрока в очередь поиска
+    searching_players.add(user_id)
+    await context.bot.send_message(chat_id, "🔍 *Поиск случайного соперника...*\n\n_Ожидай, скоро найдётся!_", parse_mode="Markdown")
+
+    # Ищем соперника среди других игроков в очереди
+    opponent_id = None
+    for pid in list(searching_players):
+        if pid != user_id:
+            opponent_id = pid
+            break
+
+    if opponent_id:
+        # Удаляем обоих из очереди
+        searching_players.discard(user_id)
+        searching_players.discard(opponent_id)
+        
+        # Проверяем, что соперник не в дуэли
+        if opponent_id in user_duel:
+            searching_players.add(user_id)
+            await context.bot.send_message(chat_id, "❌ Соперник уже начал дуэль. Попробуй ещё раз.")
+            return
+
+        # Проверяем коллекцию соперника
+        if len(get_collection(opponent_id)) < 3:
+            searching_players.add(user_id)
+            await context.bot.send_message(chat_id, "❌ У соперника меньше 3 героев. Ищем другого...")
+            # Продолжаем поиск
+            await duel_random(update, context)
+            return
+
+        # Запускаем дуэль
+        await proceed_to_hero_selection(update, context, user_id, chat_id, opponent_id, random_match=True)
+    else:
+        # Ждём 30 секунд, если никто не нашёлся
+        await asyncio.sleep(30)
+        
+        # Проверяем, не добавился ли кто-то за это время
+        opponent_id = None
+        for pid in list(searching_players):
+            if pid != user_id:
+                opponent_id = pid
+                break
+
+        if opponent_id:
+            searching_players.discard(user_id)
+            searching_players.discard(opponent_id)
+            if len(get_collection(opponent_id)) < 3:
+                searching_players.add(user_id)
+                await context.bot.send_message(chat_id, "❌ У соперника меньше 3 героев. Попробуй позже.")
+                return
+            await proceed_to_hero_selection(update, context, user_id, chat_id, opponent_id, random_match=True)
+        else:
+            searching_players.discard(user_id)
+            await context.bot.send_message(chat_id, "😴 *Никто не нашёлся за 30 секунд.*\nПопробуй ещё раз или выбери другой режим!", parse_mode="Markdown")
 
 
 async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -294,11 +362,11 @@ async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "bot")
 
 
-async def proceed_to_hero_selection(update, context, user_id, chat_id, opponent_id, invited=False):
-    user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": opponent_id}
+async def proceed_to_hero_selection(update, context, user_id, chat_id, opponent_id, invited=False, random_match=False):
+    user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "random" if random_match else "friend", "opponent": opponent_id}
     if invited:
         await context.bot.send_message(opponent_id, "✅ Твой друг принял приглашение на дуэль! Выбирайте героев...")
-    await show_hero_selection_for_duel(update, context, user_id, chat_id, "friend")
+    await show_hero_selection_for_duel(update, context, user_id, chat_id, "random" if random_match else "friend")
 
 
 async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_type):
@@ -330,7 +398,9 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
         emoji = "✅" if is_selected else "⬜"
         save_chance = SAVE_CHANCES.get(rarity, 0)
         r_emoji = {"легендарный": "👑", "эпический": "⭐", "редкий": "🔵", "обычный": "📘"}.get(rarity, "📘")
-        keyboard.append([InlineKeyboardButton(f"{emoji} {r_emoji} {hero['name'][:15]} ({save_chance}%)", callback_data=f"hsel|{i}")])
+        # Показываем множитель для произведения
+        mult = WORK_MULTIPLIERS.get(rarity, 1)
+        keyboard.append([InlineKeyboardButton(f"{emoji} {r_emoji} {hero['name'][:12]} (x{mult}, {save_chance}%)", callback_data=f"hsel|{i}")])
 
     nav = []
     if page > 0:
@@ -345,9 +415,25 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
     keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
 
     total_save = sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in selected)
-    bonus_text = f"\n\n🔄 *Шанс спасения:* {total_save}% (один раз)" if selected else ""
+    
+    # Показываем бонусы к произведениям
+    bonus_text = ""
+    if selected:
+        work_weights = defaultdict(int)
+        for key in selected:
+            hero = collection[key]
+            work = hero.get("book", "")
+            if work:
+                work_weights[work] += WORK_MULTIPLIERS.get(hero.get("rarity", "обычный"), 1)
+        
+        if work_weights:
+            bonus_text = "\n\n📚 *Бонусы к вопросам:*"
+            for work, weight in work_weights.items():
+                bonus_text += f"\n• {work}: x{weight}"
+        
+        bonus_text += f"\n\n🔄 *Шанс спасения:* {total_save}% (один раз)"
 
-    text = f"⚔️ *Выбор героев для дуэли*\n\nВыбери *3 героя*\nВыбрано: {len(selected)}/3\n\n⬜ — не выбран, ✅ — выбран\nВ скобках — шанс спасти неправильный ответ\n👑12% ⭐9% 🔵6% 📘3%{bonus_text}"
+    text = f"⚔️ *Выбор героев для дуэли*\n\nВыбери *3 героя*\nВыбрано: {len(selected)}/3\n\n⬜ — не выбран, ✅ — выбран\nВ скобках: множитель и шанс спасения\n👑x10 12% ⭐x4 9% 🔵x3 6% 📘x2 3%{bonus_text}"
 
     await show_menu(update, context, user_id, chat_id, text, InlineKeyboardMarkup(keyboard))
 
@@ -416,7 +502,7 @@ async def start_duel_after_selection(update, context, user_id):
         await start_bot_duel(update, context, user_id, selected)
         return
 
-    if duel_type == "friend" and opponent_id:
+    if opponent_id:
         p2_collection = get_collection(opponent_id)
         p2_keys = list(p2_collection.keys())
         rarity_order = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
@@ -425,28 +511,9 @@ async def start_duel_after_selection(update, context, user_id):
         await start_duel(update, context, user_id, opponent_id, selected, p2_chosen)
         return
 
-    opponent_id = get_opponent(user_id)
-    if not opponent_id:
-        user_selection.pop(user_id, None)
-        await context.bot.send_message(user_id, "😴 Нет других игроков. Попробуй позже.")
-        return
-
-    if opponent_id in user_duel:
-        user_selection.pop(user_id, None)
-        await context.bot.send_message(user_id, "Соперник уже в игре.")
-        return
-
-    p2_collection = get_collection(opponent_id)
-    p2_keys = list(p2_collection.keys())
-    if len(p2_keys) < 3:
-        user_selection.pop(user_id, None)
-        await context.bot.send_message(user_id, "❌ У соперника меньше 3 героев.")
-        return
-
-    rarity_order = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
-    sorted_keys = sorted(p2_keys, key=lambda k: rarity_order.get(p2_collection[k].get("rarity", "обычный"), 4))
-    p2_chosen = sorted_keys[:3] if len(sorted_keys) >= 3 else random.sample(p2_keys, 3)
-    await start_duel(update, context, user_id, opponent_id, selected, p2_chosen)
+    # Если соперник не найден (ошибка)
+    user_selection.pop(user_id, None)
+    await context.bot.send_message(user_id, "❌ Ошибка поиска соперника. Попробуй ещё раз.")
 
 
 async def start_duel(update, context, user_id, opponent_id, p1_chosen, p2_chosen):
@@ -577,12 +644,9 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_key = "p1" if is_p1 else "p2"
     opponent_key = "p2" if is_p1 else "p1"
     
-    # Исправление: получаем ID соперника
     if duel.get("is_bot"):
-        # Если дуэль с ботом, соперник - "bot"
         player_other = "bot" if not is_p1 else None
     else:
-        # Обычная дуэль: получаем ID из словаря
         player_other = duel.get("player2") if is_p1 else duel.get("player1")
     
     is_bot = duel.get("is_bot", False)
@@ -713,6 +777,9 @@ async def stop_duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Дуэль уже завершена.")
         return
 
+    # Удаляем из очереди поиска, если там был
+    searching_players.discard(user_id)
+
     if duel.get("is_bot"):
         await context.bot.send_message(duel["player1"], "🤖 Бот победил! Ты завершил дуэль командой /stopduel.")
     else:
@@ -738,3 +805,4 @@ def cancel_duel(duel_id: str):
                 del user_duel[pid]
             if pid in user_selection:
                 del user_selection[pid]
+            searching_players.discard(pid)
