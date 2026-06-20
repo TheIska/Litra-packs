@@ -17,7 +17,6 @@ def get_moscow_date():
 
 
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Запускает викторину — 50 монет за первые 5 правильных ответов"""
     query = update.callback_query
     if query:
         try:
@@ -30,13 +29,11 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
-    # Проверяем, есть ли уже активная викторина
     for qid, quiz in active_quizzes.items():
         if quiz["user_id"] == user_id and not quiz.get("is_finished", False):
             await show_quiz_question(update, context, qid)
             return
     
-    # Создаём новую викторину
     all_questions = random.sample(QUESTIONS, len(QUESTIONS))
     
     quiz_id = f"quiz_{user_id}_{int(datetime.now().timestamp())}"
@@ -45,10 +42,10 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "user_id": user_id,
         "all_questions": all_questions,
         "current_index": 0,
-        "correct_count": 0,           # Счётчик правильных ответов (всего)
-        "rewarded_count": 0,          # Сколько раз уже дали монеты (макс 5)
-        "wrong_total": 0,             # Всего неправильных ответов
-        "coins_earned": 0,            # Всего заработано монет
+        "correct_count": 0,
+        "rewarded_count": 0,
+        "wrong_total": 0,
+        "coins_earned": 0,
         "is_finished": False,
     }
     
@@ -75,20 +72,20 @@ async def show_quiz_question(update, context, quiz_id):
     if not work:
         work = extract_work(question.get("text", ""))
     
-    work_text = f"\n📖 *{work}*" if work else ""
+    work_text = f"\n📖 {work}" if work else ""
     
     rewarded = quiz['rewarded_count']
     remaining = 5 - rewarded
     
     text = (
-        f"📝 *Викторина*\n"
+        f"📝 Викторина\n"
         f"💰 50 монет за каждый из первых 5 правильных ответов\n"
         f"✅ Правильных: {quiz['correct_count']} (осталось бонусов: {remaining})\n"
         f"❌ Неправильных: {quiz['wrong_total']}\n"
         f"💵 Заработано: {quiz['coins_earned']} монет\n\n"
         f"{question['text']}"
         f"{work_text}\n\n"
-        f"_Выбери вариант ответа:_"
+        f"Выбери вариант ответа:"
     )
     
     keyboard = []
@@ -100,14 +97,14 @@ async def show_quiz_question(update, context, quiz_id):
     if update.callback_query:
         await update.callback_query.edit_message_text(
             text,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=reply_markup
         )
     else:
         await context.bot.send_message(
             user_id,
             text,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=reply_markup
         )
 
@@ -144,7 +141,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if is_correct:
         quiz["correct_count"] += 1
         
-        # Проверяем, можно ли дать монеты (только первые 5 правильных)
         if quiz["rewarded_count"] < 5:
             add_coins(user_id, 50)
             quiz["coins_earned"] += 50
@@ -152,30 +148,29 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             rewarded = quiz["rewarded_count"]
             
             await query.edit_message_text(
-                f"✅ *Правильно!*\n\n"
+                f"✅ Правильно!\n\n"
                 f"Правильный ответ: {correct_text}\n"
                 f"💰 +50 монет! ({rewarded}/5)\n"
                 f"💵 Всего заработано: {quiz['coins_earned']} монет",
-                parse_mode="Markdown"
+                parse_mode=None
             )
         else:
-            # Лимит исчерпан — просто показываем, что правильно, но без монет
             await query.edit_message_text(
-                f"✅ *Правильно!*\n\n"
+                f"✅ Правильно!\n\n"
                 f"Правильный ответ: {correct_text}\n"
                 f"💵 Всего заработано: {quiz['coins_earned']} монет\n\n"
-                f"_Ты уже получил все 5 бонусов! Отвечай дальше для удовольствия._",
-                parse_mode="Markdown"
+                f"Ты уже получил все 5 бонусов! Отвечай дальше для удовольствия.",
+                parse_mode=None
             )
     else:
         quiz["wrong_total"] += 1
         
         await query.edit_message_text(
-            f"❌ *Неправильно.*\n\n"
+            f"❌ Неправильно.\n\n"
             f"Правильный ответ: {correct_text}\n"
             f"💵 Всего заработано: {quiz['coins_earned']} монет\n\n"
-            f"_Не расстраивайся! Отвечай дальше._",
-            parse_mode="Markdown"
+            f"Не расстраивайся! Отвечай дальше.",
+            parse_mode=None
         )
     
     quiz["current_index"] += 1
@@ -185,7 +180,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Останавливает викторину"""
     user_id = update.effective_user.id
     
     for quiz_id, quiz in list(active_quizzes.items()):
@@ -194,12 +188,12 @@ async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             earned = quiz["coins_earned"]
             rewarded = quiz["rewarded_count"]
             await update.message.reply_text(
-                f"🏁 *Викторина завершена!*\n\n"
-                f"💰 Ты заработал *{earned} монет* ({rewarded}/5 бонусов)\n"
+                f"🏁 Викторина завершена!\n\n"
+                f"💰 Ты заработал {earned} монет ({rewarded}/5 бонусов)\n"
                 f"✅ Правильных ответов: {quiz['correct_count']}\n"
                 f"❌ Неправильных: {quiz['wrong_total']}\n\n"
-                f"_Отправь /quiz, чтобы начать заново_",
-                parse_mode="Markdown"
+                f"Отправь /quiz, чтобы начать заново",
+                parse_mode=None
             )
             active_quizzes.pop(quiz_id, None)
             return

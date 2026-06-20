@@ -3,7 +3,6 @@ from telegram.ext import ContextTypes
 from ..database import get_user, get_collection
 from datetime import datetime, timedelta
 
-# ID админа (твой Telegram ID)
 ADMIN_ID = 6082384471
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -34,9 +33,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     welcome_text = (
-        f"📖 *Литературный Герой*\n\n"
-        f"💰 Баланс: *{user['coins']}* монет\n"
-        f"📚 Героев в коллекции: *{len(collection)}*\n"
+        f"📖 Литературный Герой\n\n"
+        f"💰 Баланс: {user['coins']} монет\n"
+        f"📚 Героев в коллекции: {len(collection)}\n"
         f"{timer_text}\n\n"
         "Используй кнопки ниже:"
     )
@@ -55,14 +54,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text=welcome_text,
-                parse_mode="Markdown",
+                parse_mode=None,
                 reply_markup=reply_markup
             )
         else:
             try:
                 await query.edit_message_text(
                     welcome_text,
-                    parse_mode="Markdown",
+                    parse_mode=None,
                     reply_markup=reply_markup
                 )
             except Exception:
@@ -70,13 +69,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             welcome_text,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=reply_markup
         )
 
 
 async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик кнопки 'Сообщить об ошибке'"""
     query = update.callback_query
     try:
         await query.answer()
@@ -96,13 +94,12 @@ async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(
         text,
-        parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок
+        parse_mode=None,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
 async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересылает сообщение пользователя админу"""
     if update.message and update.message.text:
         user = update.effective_user
         user_name = user.first_name or "Пользователь"
@@ -134,7 +131,6 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /help (оставляем для команд)"""
     query = update.callback_query
     if query:
         try:
