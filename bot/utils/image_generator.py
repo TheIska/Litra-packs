@@ -50,6 +50,21 @@ def load_portrait(hero):
     return None
 
 
+def load_logo():
+    """Загружает логотип бота"""
+    logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'logo.png')
+    if os.path.exists(logo_path):
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+            # Уменьшаем логотип до разумного размера
+            logo.thumbnail((60, 60), Image.Resampling.LANCZOS)
+            return logo
+        except Exception as e:
+            print(f"Ошибка загрузки логотипа: {e}")
+            return None
+    return None
+
+
 def get_years(author):
     years = {
         "А.С. Пушкин": "1799–1837",
@@ -120,64 +135,71 @@ def create_vintage_texture(width, height):
                 b = max(0, min(255, pixels[x, y][2] + noise))
                 pixels[x, y] = (r, g, b)
     
+    # Лёгкие пятна
+    for _ in range(10):
+        x = random.randint(20, width - 20)
+        y = random.randint(20, height - 20)
+        radius = random.randint(15, 50)
+        color = (random.randint(210, 235), random.randint(200, 225), random.randint(185, 215))
+        for i in range(radius):
+            alpha = int(25 * (1 - i / radius))
+            draw.ellipse([(x - i, y - i), (x + i, y + i)], 
+                        fill=(color[0], color[1], color[2], alpha))
+    
     return img
 
 
 def draw_elegant_frame(draw, width, height, pal):
-    """Рисует элегантную рамку с узорами"""
-    p = 20
+    """Рисует элегантную рамку"""
+    p = 18
     
-    # Основная рамка
     draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
-    draw.rectangle([(p + 6, p + 6), (width - p - 6, height - p - 6)], outline=pal["border_light"], width=1)
+    draw.rectangle([(p + 5, p + 5), (width - p - 5, height - p - 5)], outline=pal["border_light"], width=1)
+    draw.rectangle([(p + 10, p + 10), (width - p - 10, height - p - 10)], outline=pal["border"], width=1)
     
-    # Декоративные уголки
-    corner_size = 20
+    # Уголки
+    corner_size = 22
     corners = [
-        (p + 6, p + 6, 1, 1),
-        (width - p - 6, p + 6, -1, 1),
-        (p + 6, height - p - 6, 1, -1),
-        (width - p - 6, height - p - 6, -1, -1)
+        (p + 10, p + 10, 1, 1),
+        (width - p - 10, p + 10, -1, 1),
+        (p + 10, height - p - 10, 1, -1),
+        (width - p - 10, height - p - 10, -1, -1)
     ]
     
     for cx, cy, dx, dy in corners:
-        for i in range(2):
-            size = corner_size - i * 5
-            draw.arc([cx - size, cy - size, cx + size, cy + size], 
-                     0 if dx > 0 else 90, 
-                     90 if dy > 0 else 180, 
-                     fill=pal["border"], width=1)
+        for i in range(3):
+            size = corner_size - i * 6
+            if size > 5:
+                draw.arc([cx - size, cy - size, cx + size, cy + size], 
+                         0 if dx > 0 else 90, 
+                         90 if dy > 0 else 180, 
+                         fill=pal["border_light"], width=1)
 
 
-def draw_ornament_pattern(draw, x, y, width, pal):
-    """Рисует декоративный узор для заполнения пустоты"""
-    # Декоративные элементы
-    spacing = 25
-    for i in range(3):
-        pos_x = x + i * spacing
-        # Маленький цветок
+def draw_ornament_pattern(draw, x, y, width, pal, count=5):
+    """Рисует декоративный узор"""
+    spacing = width // count
+    for i in range(count):
+        pos_x = x + i * spacing + spacing // 2
         for angle in range(0, 360, 45):
             rad = math.radians(angle)
-            dx = int(5 * math.cos(rad))
-            dy = int(5 * math.sin(rad))
+            dx = int(4 * math.cos(rad))
+            dy = int(4 * math.sin(rad))
             draw.point((pos_x + dx, y + dy), fill=pal["border_light"])
-        
-        # Центральная точка
         draw.ellipse([(pos_x - 2, y - 2), (pos_x + 2, y + 2)], fill=pal["accent"])
 
 
 def draw_hero_name(draw, x, y, name, pal):
-    """Рисует имя героя с декоративным обрамлением"""
-    font_name = load_font(34, "bold")
+    """Рисует имя героя"""
+    font_name = load_font(32, "bold")
     
     # Тень
     for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-        draw.text((x + dx, y + dy), name, fill=(0, 0, 0, 30), font=font_name, anchor="mt")
+        draw.text((x + dx, y + dy), name, fill=(0, 0, 0, 25), font=font_name, anchor="mt")
     
-    # Основной текст
     draw.text((x, y), name, fill=pal["text"], font=font_name, anchor="mt")
     
-    # Декоративное подчёркивание
+    # Подчёркивание
     try:
         bbox = draw.textbbox((0, 0), name, font=font_name)
         text_width = bbox[2] - bbox[0]
@@ -185,11 +207,8 @@ def draw_hero_name(draw, x, y, name, pal):
         text_width = len(name) * 18
     
     line_y = y + 18
-    # Тонкая линия
     draw.line([(x - text_width//2 - 20, line_y), (x + text_width//2 + 20, line_y)], 
               fill=pal["accent"], width=1)
-    
-    # Точки по краям линии
     draw.ellipse([(x - text_width//2 - 24, line_y - 3), (x - text_width//2 - 18, line_y + 3)], 
                  fill=pal["accent"])
     draw.ellipse([(x + text_width//2 + 18, line_y - 3), (x + text_width//2 + 24, line_y + 3)], 
@@ -197,15 +216,14 @@ def draw_hero_name(draw, x, y, name, pal):
 
 
 def draw_quote_style(draw, x, y, quote, pal):
-    """Рисует цитату с красивым оформлением"""
+    """Рисует цитату"""
     font_quote = load_font(15, "italic")
     font_big = load_font(30, "italic")
     
-    # Разбиваем на строки
     words = quote.split()
     lines = []
     current_line = ""
-    max_width = 370
+    max_width = 350
     
     for word in words:
         test_line = current_line + " " + word if current_line else word
@@ -223,22 +241,22 @@ def draw_quote_style(draw, x, y, quote, pal):
     if current_line:
         lines.append(current_line)
     
-    # Декоративная линия слева
-    draw.line([(x, y), (x, y + len(lines[:3]) * 20 + 10)], 
-              fill=pal["border_light"], width=1)
+    # Вертикальная линия
+    line_height_total = len(lines[:3]) * 20 + 10
+    draw.line([(x, y), (x, y + line_height_total)], fill=pal["border_light"], width=1)
     draw.ellipse([(x - 3, y - 3), (x + 3, y + 3)], fill=pal["accent"])
+    draw.ellipse([(x - 3, y + line_height_total - 3), (x + 3, y + line_height_total + 3)], 
+                 fill=pal["border_light"])
     
-    # Открывающая кавычка
     draw.text((x + 15, y - 5), "«", fill=pal["accent"], font=font_big, anchor="lt")
     
-    # Текст
     line_height = font_quote.size + 4
     max_lines = min(len(lines), 3)
     for i in range(max_lines):
         text_y = y + i * line_height
+        draw.text((x + 36, text_y + 1), lines[i], fill=(0, 0, 0, 15), font=font_quote)
         draw.text((x + 35, text_y), lines[i], fill=pal["sub"], font=font_quote)
     
-    # Закрывающая кавычка
     if lines:
         last_y = y + (max_lines - 1) * line_height
         try:
@@ -268,7 +286,6 @@ def draw_rarity_badge(draw, x, y, rarity, pal):
     color = colors.get(rarity, (150, 140, 130))
     font = load_font(16, "bold")
     
-    # Декоративная рамка
     try:
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
@@ -281,11 +298,11 @@ def draw_rarity_badge(draw, x, y, rarity, pal):
     rect_x2 = x + text_width//2 + padding
     rect_y2 = y + 14
     
-    # Прозрачный фон
     draw.rectangle([(rect_x1, rect_y1), (rect_x2, rect_y2)], 
                    fill=(255, 255, 255, 180), outline=pal["border"], width=1)
+    draw.rectangle([(rect_x1 + 3, rect_y1 + 3), (rect_x2 - 3, rect_y2 - 3)], 
+                   outline=pal["border_light"], width=1)
     
-    # Символы
     symbols = {
         "легендарный": "✦",
         "эпический": "✧",
@@ -294,26 +311,86 @@ def draw_rarity_badge(draw, x, y, rarity, pal):
     }
     symbol = symbols.get(rarity, "•")
     
+    draw.text((x + 1, y + 1), f"{symbol} {text} {symbol}", fill=(0, 0, 0, 20), font=font, anchor="mt")
     draw.text((x, y), f"{symbol} {text} {symbol}", fill=color, font=font, anchor="mt")
 
 
-def draw_corner_ornaments(draw, width, height, pal):
-    """Рисует декоративные орнаменты в углах"""
-    # Верхний левый угол
-    draw.arc([30, 30, 80, 80], 0, 90, fill=pal["border_light"], width=1)
-    draw.arc([35, 35, 75, 75], 0, 90, fill=pal["accent"], width=1)
+def draw_book_illustration(draw, x, y, width, height, pal, book_title):
+    """Рисует стилизованную обложку книги"""
+    # Рамка книги
+    draw.rectangle([(x, y), (x + width, y + height)], outline=pal["border"], width=2)
+    draw.rectangle([(x + 5, y + 5), (x + width - 5, y + height - 5)], outline=pal["border_light"], width=1)
     
-    # Верхний правый угол
-    draw.arc([width - 80, 30, width - 30, 80], 90, 180, fill=pal["border_light"], width=1)
-    draw.arc([width - 75, 35, width - 35, 75], 90, 180, fill=pal["accent"], width=1)
+    # Корешок
+    draw.line([(x + 15, y), (x + 15, y + height)], fill=pal["border"], width=1)
+    draw.line([(x + 17, y), (x + 17, y + height)], fill=pal["border_light"], width=1)
     
-    # Нижний левый угол
-    draw.arc([30, height - 80, 80, height - 30], 270, 360, fill=pal["border_light"], width=1)
-    draw.arc([35, height - 75, 75, height - 35], 270, 360, fill=pal["accent"], width=1)
+    # Название на обложке
+    font_book = load_font(16, "bold")
+    # Разбиваем название на строки
+    words = book_title.split()
+    lines = []
+    current_line = ""
+    for word in words:
+        if len(current_line + " " + word) <= 15:
+            current_line += " " + word if current_line else word
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
     
-    # Нижний правый угол
-    draw.arc([width - 80, height - 80, width - 30, height - 30], 180, 270, fill=pal["border_light"], width=1)
-    draw.arc([width - 75, height - 75, width - 35, height - 35], 180, 270, fill=pal["accent"], width=1)
+    # Центрируем название
+    text_y = y + height//2 - (len(lines) * 20)//2
+    for line in lines[:3]:
+        draw.text((x + width//2 + 10, text_y), line, fill=pal["text"], font=font_book, anchor="mt")
+        text_y += 20
+    
+    # Декоративные элементы
+    draw_ornament_pattern(draw, x + width//2 + 10, y + 15, 80, pal, 3)
+    draw_ornament_pattern(draw, x + width//2 + 10, y + height - 15, 80, pal, 3)
+
+
+def draw_logo(draw, x, y, pal, logo_img):
+    """Рисует логотип бота"""
+    if logo_img:
+        # Вставляем загруженный логотип
+        logo_x = x - logo_img.width // 2
+        logo_y = y - logo_img.height // 2
+        draw.ellipse([(logo_x - 5, logo_y - 5), (logo_x + logo_img.width + 5, logo_y + logo_img.height + 5)],
+                    outline=pal["border"], width=1)
+        return logo_img, (logo_x, logo_y)
+    else:
+        # Если логотип не загружен, рисуем заглушку (книга со свечой)
+        book_width = 50
+        book_height = 38
+        book_x = x - book_width//2
+        book_y = y - book_height//2
+        
+        draw.rectangle([(book_x, book_y), (book_x + book_width, book_y + book_height)], 
+                       fill=(255, 255, 255, 200), outline=pal["border"], width=2)
+        
+        for i in range(3):
+            offset = 3 + i * 3
+            draw.line([(book_x + offset, book_y + 5), (book_x + offset, book_y + book_height - 5)], 
+                      fill=pal["border_light"], width=1)
+        
+        # Свеча
+        candle_x = x + 30
+        candle_y = y - 15
+        draw.rectangle([(candle_x - 3, candle_y), (candle_x + 3, candle_y + 12)], 
+                       fill=(245, 220, 200), outline=pal["border"], width=1)
+        draw.line([(candle_x, candle_y), (candle_x, candle_y - 4)], fill=(50, 50, 50), width=1)
+        
+        for i in range(3):
+            flame_size = 4 - i * 1.5
+            if flame_size > 0:
+                draw.ellipse([(candle_x - flame_size, candle_y - 7 - i * 3),
+                             (candle_x + flame_size, candle_y - 3 - i * 3)], 
+                            fill=(255, 200, 50, 255 - i * 80))
+        
+        return None, None
 
 
 def create_hero_card(hero):
@@ -321,7 +398,6 @@ def create_hero_card(hero):
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
 
-    # Цветовые палитры
     colors = {
         "легендарный": {
             "bg": (240, 232, 215),
@@ -359,60 +435,69 @@ def create_hero_card(hero):
 
     pal = colors.get(rarity, colors["обычный"])
 
-    # Создаём фон
     img = create_vintage_texture(width, height)
     draw = ImageDraw.Draw(img)
 
+    # Загружаем логотип
+    logo_img = load_logo()
+    
     # Рамка
     draw_elegant_frame(draw, width, height, pal)
-    
-    # Угловые орнаменты
-    draw_corner_ornaments(draw, width, height, pal)
+
+    # Логотип в левом верхнем углу
+    logo_result = draw_logo(draw, 55, 40, pal, logo_img)
+    if logo_img:
+        logo_img_resized, (logo_x, logo_y) = logo_result
+        if logo_img_resized:
+            img.paste(logo_img_resized, (logo_x, logo_y), logo_img_resized)
 
     # Заголовок
     y = 38
     font_title = load_font(20, "italic")
     title_text = "✦ Litra Packs ✦"
-    draw.text((width//2, y), title_text, fill=pal["accent"], font=font_title, anchor="mt")
-    y += 28
+    draw.text((width//2 + 20, y), title_text, fill=pal["accent"], font=font_title, anchor="mt")
+    
+    y += 15
+    draw_ornament_pattern(draw, width//2 - 80, y, 160, pal, 7)
+    y += 30
 
-    # Портрет
+    # Портрет или обложка
     portrait_y = y
-    portrait_size = 180
+    portrait_size = 170
     
     if is_legendary:
         portrait = load_portrait(hero)
         if portrait:
             portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
             
-            # Маска для круга
             mask = Image.new('L', (portrait_size, portrait_size), 0)
             mask_draw = ImageDraw.Draw(mask)
             mask_draw.ellipse((2, 2, portrait_size - 2, portrait_size - 2), fill=255)
-            
             portrait.putalpha(mask)
             
             x = (width - portrait_size) // 2
             img.paste(portrait, (x, portrait_y), portrait)
             
-            # Рамка вокруг портрета с декоративными элементами
             draw.ellipse([(x - 6, portrait_y - 6), (x + portrait_size + 6, portrait_y + portrait_size + 6)], 
                          outline=pal["border"], width=2)
             draw.ellipse([(x - 3, portrait_y - 3), (x + portrait_size + 3, portrait_y + portrait_size + 3)], 
                          outline=pal["accent"], width=1)
             
-            # Декоративные точки вокруг портрета
-            for angle in range(0, 360, 30):
+            for angle in range(0, 360, 20):
                 rad = math.radians(angle)
                 ox = x + portrait_size//2 + int((portrait_size//2 + 12) * math.cos(rad))
                 oy = portrait_y + portrait_size//2 + int((portrait_size//2 + 12) * math.sin(rad))
-                draw.ellipse([(ox - 2, oy - 2), (ox + 2, oy + 2)], fill=pal["accent"])
+                size = 2 if angle % 40 == 0 else 1
+                draw.ellipse([(ox - size, oy - size), (ox + size, oy + size)], fill=pal["accent"])
             
             y = portrait_y + portrait_size + 30
         else:
             y = portrait_y + 190
     else:
-        y = portrait_y + 120
+        # Для нелегендарных героев - обложка книги
+        book_title = hero.get("book", hero.get("work", "Книга"))
+        draw_book_illustration(draw, width//2 - 85, portrait_y, 170, 170, pal, book_title)
+        y = portrait_y + 190
 
     # Имя героя
     name = hero.get("name", "Неизвестный герой")
@@ -427,15 +512,13 @@ def create_hero_card(hero):
         author = hero.get("author", "")
         years = get_years(author)
         draw.text((width//2, y), years, fill=pal["sub"], font=font_info_small, anchor="mt")
-        y += 24
+        y += 22
         
         quote = get_random_quote(author)
         draw_quote_style(draw, 40, y, quote, pal)
         y += 100
         
-        # Декоративный разделитель
-        draw_ornament_pattern(draw, width//2 - 25, y - 10, 50, pal)
-        
+        draw_ornament_pattern(draw, width//2 - 50, y - 8, 100, pal, 5)
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_info_small, anchor="mt")
         y += 35
     else:
@@ -443,10 +526,9 @@ def create_hero_card(hero):
         if len(book) > 30:
             book = book[:27] + "..."
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_info, anchor="mt")
-        y += 26
+        y += 24
         
-        # Декоративный разделитель
-        draw_ornament_pattern(draw, width//2 - 25, y - 5, 50, pal)
+        draw_ornament_pattern(draw, width//2 - 50, y - 5, 100, pal, 5)
         
         author = hero.get("author", "Неизвестный автор")
         draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_info_small, anchor="mt")
@@ -457,7 +539,7 @@ def create_hero_card(hero):
     y += 35
 
     # Декоративный узор внизу
-    draw_ornament_pattern(draw, width//2 - 40, height - 48, 80, pal)
+    draw_ornament_pattern(draw, width//2 - 60, height - 48, 120, pal, 7)
 
     # Футер
     footer_y = height - 22
@@ -466,17 +548,13 @@ def create_hero_card(hero):
              fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 180), 
              font=font_footer, anchor="mt")
     
-    # Лёгкое размытие
+    # Эффекты
     img = img.filter(ImageFilter.GaussianBlur(radius=0.3))
-    
-    # Повышаем чёткость
     enhancer = ImageEnhance.Sharpness(img)
     img = enhancer.enhance(1.4)
-    
     enhancer = ImageEnhance.Contrast(img)
     img = enhancer.enhance(1.05)
 
-    # Сохранение
     bio = io.BytesIO()
     img.save(bio, format='JPEG', quality=95, optimize=True)
     bio.seek(0)
