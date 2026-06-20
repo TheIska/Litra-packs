@@ -1,5 +1,3 @@
-# bot/main.py
-
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
@@ -13,8 +11,8 @@ from .handlers.start import (
     forward_to_admin
 )
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
-from .handlers.collection import (
-    show_collection, 
+from .handlers.album import (
+    show_album, 
     album_navigation, 
     find_card_by_number,
     handle_card_number_input
@@ -75,9 +73,9 @@ def main():
     app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
-    # ========== КОЛЛЕКЦИЯ / АЛЬБОМ ==========
-    app.add_handler(CallbackQueryHandler(show_collection, pattern="^collection$"))
-    app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))  # album_prev, album_next, album_goto_
+    # ========== АЛЬБОМ ==========
+    app.add_handler(CallbackQueryHandler(show_album, pattern="^album$"))
+    app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
     app.add_handler(CallbackQueryHandler(find_card_by_number, pattern="^album_find$"))
 
     # ========== ДУЭЛИ ==========
@@ -103,7 +101,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
 
-    # ========== ВИКТОРИНА (ответы) ==========
+    # ========== ВИКТОРИНА ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
 
     # ========== ВВОД НОМЕРА КАРТЫ ==========

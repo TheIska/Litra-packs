@@ -50,7 +50,7 @@ def init_db():
     conn.close()
 
 def migrate_db():
-    """Добавляет недостающие колонки для викторины и альбома"""
+    """Добавляет недостающие колонки"""
     conn = get_connection()
     c = conn.cursor()
     
@@ -169,33 +169,18 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     return result
 
 def add_hero_to_collection(user_id: int, hero: Dict) -> None:
-    """Добавляет героя в коллекцию"""
+    """Добавляет героя в коллекцию с фиксированным номером"""
     hero_key = f"{hero['author']} – {hero['name']}"
+    hero_number = hero.get('card_number', 0)
+    
     conn = get_connection()
     c = conn.cursor()
     c.execute(
-        "INSERT OR REPLACE INTO collection (user_id, hero_key, hero_data) VALUES (?, ?, ?)",
-        (user_id, hero_key, json.dumps(hero, ensure_ascii=False))
+        "INSERT OR REPLACE INTO collection (user_id, hero_key, hero_data, card_number) VALUES (?, ?, ?, ?)",
+        (user_id, hero_key, json.dumps(hero, ensure_ascii=False), hero_number)
     )
     conn.commit()
     conn.close()
-
-def assign_card_number(user_id: int, hero_key: str) -> int:
-    """Присваивает уникальный номер карты"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    # Получаем следующий номер
-    c.execute("SELECT MAX(card_number) FROM collection WHERE user_id = ?", (user_id,))
-    row = c.fetchone()
-    next_number = (row[0] or 0) + 1
-    
-    # Обновляем карту с номером
-    c.execute("UPDATE collection SET card_number = ? WHERE user_id = ? AND hero_key = ?", 
-              (next_number, user_id, hero_key))
-    conn.commit()
-    conn.close()
-    return next_number
 
 def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
     """Обновляет время последнего бесплатного пака"""
