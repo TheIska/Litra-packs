@@ -109,6 +109,33 @@ def get_opponent(user_id: int) -> Optional[int]:
     conn.close()
     return row[0] if row else None
 
+def get_all_users() -> list:
+    """Возвращает список всех пользователей"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users")
+    rows = c.fetchall()
+    conn.close()
+    return [{"user_id": row[0]} for row in rows]
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Возвращает данные пользователя по ID"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT user_id, last_free_pack, wins, losses, rating, coins FROM users WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {
+            "user_id": row[0],
+            "last_free_pack": row[1],
+            "wins": row[2],
+            "losses": row[3],
+            "rating": row[4],
+            "coins": row[5]
+        }
+    return None
+
 def add_coins(user_id: int, amount: int) -> None:
     conn = get_connection()
     c = conn.cursor()
@@ -128,3 +155,79 @@ def spend_coins(user_id: int, amount: int) -> bool:
         return True
     conn.close()
     return False
+
+def get_leaderboard(limit: int = 10) -> list:
+    """Возвращает список лучших игроков по рейтингу"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT user_id, wins, losses, rating, coins 
+        FROM users 
+        ORDER BY rating DESC 
+        LIMIT ?
+    """, (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {
+            "user_id": row[0],
+            "wins": row[1],
+            "losses": row[2],
+            "rating": row[3],
+            "coins": row[4]
+        }
+        for row in rows
+    ]
+
+def get_user_stats(user_id: int) -> Dict[str, Any]:
+    """Возвращает статистику пользователя"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT wins, losses, rating, coins FROM users WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {
+            "wins": row[0],
+            "losses": row[1],
+            "rating": row[2],
+            "coins": row[3]
+        }
+    return {"wins": 0, "losses": 0, "rating": 1200, "coins": 500}
+
+def get_collection_count(user_id: int) -> int:
+    """Возвращает количество героев в коллекции пользователя"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM collection WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+def get_heroes_by_rarity(user_id: int) -> Dict[str, int]:
+    """Возвращает количество героев по редкости"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT hero_data FROM collection WHERE user_id = ?", (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    
+    result = {"легендарный": 0, "эпический": 0, "редкий": 0, "обычный": 0}
+    for row in rows:
+        try:
+            hero = json.loads(row[0])
+            rarity = hero.get("rarity", "обычный")
+            if rarity in result:
+                result[rarity] += 1
+        except:
+            pass
+    return result
+
+def reset_user_data(user_id: int) -> None:
+    """Сбрасывает данные пользователя (для отладки)"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM collection WHERE user_id = ?", (user_id,))
+    c.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()

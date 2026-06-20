@@ -9,7 +9,12 @@ from .handlers.duel import (
     duel_command,
     answer_callback,
     stop_duel_command,
-    handle_hero_selection
+    handle_hero_selection,
+    duel_random,
+    duel_friend,
+    duel_friend_select,
+    duel_bot,
+    duel_accept,
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -48,6 +53,13 @@ def main():
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
+    app.add_handler(CallbackQueryHandler(duel_random, pattern="^duel_random$"))
+    app.add_handler(CallbackQueryHandler(duel_friend, pattern="^duel_friend$"))
+    app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\|"))
+    app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
+    app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
+    app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel_decline$"))
+    
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))

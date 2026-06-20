@@ -6,6 +6,11 @@ from .duel import (
     answer_callback,
     stop_duel_command,
     handle_hero_selection,
-    cancel_duel
+    cancel_duel,
+    duel_random,
+    duel_friend,
+    duel_friend_select,
+    duel_bot,
+    duel_accept,
 )
 from .admin import add_coins_command
