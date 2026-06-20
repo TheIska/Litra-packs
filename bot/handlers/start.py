@@ -71,4 +71,143 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-# ... остальные функции (help_command, show_coins, shop) без изменений ...
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает справку по командам"""
+    query = update.callback_query
+    if query:
+        try:
+            await query.answer()
+        except Exception:
+            pass
+        chat_id = query.message.chat_id
+        is_photo = query.message.photo
+    else:
+        chat_id = update.effective_chat.id
+        is_photo = False
+
+    help_text = (
+        "❓ *Список команд*\n\n"
+        "/start — Главное меню\n"
+        "/help — Эта справка\n"
+        "/duel — Начать дуэль\n"
+        "/stopduel — Завершить дуэль\n"
+        "/free_pack — Открыть бесплатный пак\n"
+        "/collection — Моя коллекция\n"
+        "/shop — Магазин паков\n"
+        "/quiz — Ежедневная викторина\n"
+        "/addcoins — (админ) Добавить монеты\n\n"
+        "📌 *Как играть*\n"
+        "1. Бесплатный пак каждые 3 часа.\n"
+        "2. Покупай паки за монеты с лучшими шансами.\n"
+        "3. Участвуй в дуэлях и зарабатывай монеты.\n"
+        "4. Собирай коллекцию и готовься к ЕГЭ!"
+    )
+
+    keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+    
+    if query:
+        if is_photo:
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=help_text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            try:
+                await query.edit_message_text(
+                    help_text,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            except Exception:
+                pass
+    else:
+        await update.message.reply_text(
+            help_text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+
+async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает баланс монет"""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    
+    msg = f"💰 *Твой баланс:* {user['coins']} монет.\n\nЗарабатывай монеты, участвуя в дуэлях (победа +10, поражение -5) и открывая паки!"
+    keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+    
+    if query.message.photo:
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        try:
+            await query.edit_message_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception:
+            pass
+
+
+async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает магазин паков"""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    
+    keyboard = [
+        [InlineKeyboardButton("📖 Дар читателя (бесплатно)", callback_data="free_pack")],
+        [InlineKeyboardButton("📚 Маленький пак (200 монет)", callback_data="small_pack")],
+        [InlineKeyboardButton("🔮 Лишний пак (500 монет)", callback_data="medium_pack")],
+        [InlineKeyboardButton("✨ Новый пак (1000 монет)", callback_data="large_pack")],
+        [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
+    ]
+    
+    msg = f"🛒 *Магазин паков*\n\n💰 Твой баланс: *{user['coins']}* монет\n\nВыбери, что хочешь открыть:"
+    
+    if query.message.photo:
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        try:
+            await query.edit_message_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception:
+            pass
