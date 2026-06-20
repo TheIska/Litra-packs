@@ -1,4 +1,3 @@
-# bot/handlers/__init__.py
 from .start import start, help_command, show_coins, shop
 from .pack import free_pack, small_pack, medium_pack, large_pack
 from .collection import show_collection
