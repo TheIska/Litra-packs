@@ -1,9 +1,12 @@
+# bot/utils/image_generator.py
+
 import io
 import os
 import random
 from PIL import Image, ImageDraw, ImageFont
 
 def load_font(size, style="regular"):
+    """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
@@ -21,11 +24,10 @@ def load_font(size, style="regular"):
 
 
 def load_portrait(hero):
-    """Загружает портрет для легендарного героя (только те, что есть)"""
+    """Загружает портрет для легендарного героя"""
     if hero.get("rarity") != "легендарный":
         return None
     
-    # Только 5 писателей, для которых есть портреты
     portrait_map = {
         "Александр Пушкин": "pushkin.png",
         "Михаил Лермонтов": "lermontov.png",
@@ -63,7 +65,6 @@ def get_random_quote(author):
         "А.С. Пушкин": [
             "Я жить хочу, чтоб мыслить и страдать.",
             "Гений и злодейство — две вещи несовместимые.",
-            "Вдохновение — это умение приводить себя в рабочее состояние.",
             "Привычка свыше нам дана, замена счастию она.",
             "Мой друг, отчизне посвятим души прекрасные порывы!"
         ],
@@ -71,28 +72,24 @@ def get_random_quote(author):
             "Гений, прикованный к чиновничьему столу, должен умереть или сойти с ума.",
             "Поверь мне — счастье только там, где любят нас, где верят нам!",
             "Из двух друзей всегда один раб другого.",
-            "Я люблю сомневаться во всем.",
             "Герой не тот, кто победил, а тот, кто не сдался."
         ],
         "Н.В. Гоголь": [
             "Какой же русский не любит быстрой езды?",
             "Есть у русского человека враг — лень.",
             "Нет слова, которое было бы так замашисто, как метко сказанное русское слово.",
-            "Обращаться со словами нужно честно.",
             "В каждом слове бездна пространства."
         ],
         "Ф.М. Достоевский": [
             "Человек есть тайна. Ее надо разгадывать всю жизнь.",
             "Если Бога нет, то всё позволено.",
             "Красота спасет мир.",
-            "Станьте солнцем, вас все и увидят.",
             "Безответная любовь не унижает человека, а возвышает его."
         ],
         "И.С. Тургенев": [
             "Во дни сомнений, во дни тягостных раздумий о судьбах моей родины, — ты один мне поддержка, о русский язык!",
             "Любовь сильнее смерти и страха смерти.",
             "Счастье — как здоровье: когда его не замечаешь, значит, оно есть.",
-            "Нет ничего тягостнее сознания только что сделанной глупости.",
             "Добро по указу — не добро."
         ]
     }
@@ -100,88 +97,209 @@ def get_random_quote(author):
     return random.choice(author_quotes)
 
 
+def create_textured_background(width, height, pal):
+    """Создаёт текстурированный фон под старую бумагу"""
+    img = Image.new('RGB', (width, height), color=pal["bg"])
+    draw = ImageDraw.Draw(img)
+    
+    # Основной фон с лёгким градиентом
+    for i in range(height):
+        ratio = i / height
+        r = int(pal["bg"][0] * (1 - ratio * 0.3) + pal["bg2"][0] * ratio * 0.3)
+        g = int(pal["bg"][1] * (1 - ratio * 0.3) + pal["bg2"][1] * ratio * 0.3)
+        b = int(pal["bg"][2] * (1 - ratio * 0.3) + pal["bg2"][2] * ratio * 0.3)
+        draw.line([(0, i), (width, i)], fill=(r, g, b))
+    
+    # Текстура бумаги (мелкие точки)
+    for _ in range(300):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        brightness = random.randint(180, 220)
+        draw.point((x, y), fill=(brightness, brightness - 5, brightness - 10))
+    
+    # Лёгкие потёртости по краям
+    for _ in range(50):
+        x = random.randint(0, 30)
+        y = random.randint(0, height - 1)
+        for i in range(3):
+            draw.point((x + i, y), fill=(pal["bg"][0] + 20, pal["bg"][1] + 15, pal["bg"][2] + 10))
+        x = random.randint(width - 30, width - 1)
+        for i in range(3):
+            draw.point((x - i, y), fill=(pal["bg"][0] + 20, pal["bg"][1] + 15, pal["bg"][2] + 10))
+    
+    return img
+
+
+def draw_vintage_frame(draw, width, height, pal):
+    """Рисует винтажную рамку"""
+    border = 10
+    
+    # Внешняя тонкая рамка
+    draw.rectangle([(border, border), (width - border, height - border)], outline=pal["border"], width=1)
+    
+    # Основная рамка с двойной линией
+    draw.rectangle([(border + 10, border + 10), (width - border - 10, height - border - 10)], outline=pal["border"], width=1)
+    
+    # Украшение углов (маленькие завитки)
+    corners = [
+        (border + 15, border + 15),
+        (width - border - 15, border + 15),
+        (border + 15, height - border - 15),
+        (width - border - 15, height - border - 15)
+    ]
+    for x, y in corners:
+        for i in range(4):
+            draw.arc([x - i * 6, y - i * 6, x + i * 6, y + i * 6], 0, 90, outline=pal["border"], width=1)
+            draw.arc([x - i * 6 - 2, y - i * 6 - 2, x + i * 6 + 2, y + i * 6 + 2], 0, 90, outline=pal["accent"], width=1)
+
+
 def create_hero_card(hero):
-    width, height = 400, 560
+    width, height = 450, 640
     rarity = hero.get("rarity", "обычный")
     is_legendary = (rarity == "легендарный")
 
+    # Цветовая палитра в стиле старой бумаги
     colors = {
-        "легендарный": {"bg": (35, 25, 15), "border": (255, 215, 0), "accent": (255, 215, 0), "text": (255, 240, 220), "rare": (255, 215, 0), "sub": (200, 180, 150), "bg2": (50, 40, 30)},
-        "эпический": {"bg": (25, 15, 35), "border": (155, 89, 182), "accent": (155, 89, 182), "text": (255, 240, 220), "rare": (155, 89, 182), "sub": (200, 180, 150), "bg2": (45, 30, 55)},
-        "редкий": {"bg": (15, 25, 35), "border": (52, 152, 219), "accent": (52, 152, 219), "text": (255, 240, 220), "rare": (52, 152, 219), "sub": (200, 180, 150), "bg2": (30, 45, 55)},
-        "обычный": {"bg": (30, 30, 30), "border": (150, 160, 170), "accent": (150, 160, 170), "text": (220, 210, 190), "rare": (150, 160, 170), "sub": (180, 170, 150), "bg2": (50, 50, 50)}
+        "легендарный": {
+            "bg": (235, 225, 210),
+            "bg2": (215, 200, 180),
+            "border": (180, 120, 50),
+            "accent": (200, 150, 70),
+            "text": (50, 35, 20),
+            "rare": (200, 150, 70),
+            "sub": (100, 80, 55),
+            "name_bg": (215, 200, 180),
+            "seal": (180, 120, 50),
+        },
+        "эпический": {
+            "bg": (230, 225, 215),
+            "bg2": (210, 200, 190),
+            "border": (140, 100, 150),
+            "accent": (160, 120, 170),
+            "text": (50, 35, 20),
+            "rare": (160, 120, 170),
+            "sub": (100, 80, 55),
+            "name_bg": (210, 200, 190),
+            "seal": (140, 100, 150),
+        },
+        "редкий": {
+            "bg": (225, 225, 220),
+            "bg2": (205, 205, 200),
+            "border": (80, 130, 160),
+            "accent": (90, 150, 180),
+            "text": (50, 35, 20),
+            "rare": (90, 150, 180),
+            "sub": (100, 80, 55),
+            "name_bg": (205, 205, 200),
+            "seal": (80, 130, 160),
+        },
+        "обычный": {
+            "bg": (220, 218, 210),
+            "bg2": (200, 195, 185),
+            "border": (130, 120, 110),
+            "accent": (150, 140, 130),
+            "text": (50, 35, 20),
+            "rare": (150, 140, 130),
+            "sub": (100, 80, 55),
+            "name_bg": (200, 195, 185),
+            "seal": (130, 120, 110),
+        }
     }
 
     pal = colors.get(rarity, colors["обычный"])
 
-    img = Image.new('RGB', (width, height), color=pal["bg"])
+    # Создаём фон
+    img = create_textured_background(width, height, pal)
     draw = ImageDraw.Draw(img)
-    
-    for i in range(height):
-        ratio = i / height
-        r = int(pal["bg"][0] * (1 - ratio) + pal["bg2"][0] * ratio)
-        g = int(pal["bg"][1] * (1 - ratio) + pal["bg2"][1] * ratio)
-        b = int(pal["bg"][2] * (1 - ratio) + pal["bg2"][2] * ratio)
-        draw.line([(0, i), (width, i)], fill=(r, g, b))
 
-    font_title = load_font(22, "bold")
-    font_name = load_font(34, "bold")
+    # Загрузка шрифтов
+    font_title = load_font(20, "italic")
+    font_name = load_font(38, "bold")
     font_rare = load_font(22, "bold")
     font_footer = load_font(14, "italic")
-    font_quote = load_font(14, "italic")
+    font_quote = load_font(15, "italic")
     font_years = load_font(16, "italic")
     font_book = load_font(18, "regular")
     font_author = load_font(16, "italic")
+    font_label = load_font(18, "bold")
 
-    border = 6
-    draw.rectangle([(border, border), (width - border, height - border)], outline=pal["border"], width=3)
-    draw.rectangle([(border + 8, border + 8), (width - border - 8, height - border - 8)], outline=pal["border"], width=1)
+    # Рамка
+    draw_vintage_frame(draw, width, height, pal)
 
-    draw.text((width//2, 16), "LITRA PACKS", fill=pal["accent"], font=font_title, anchor="mt")
-
-    y = 45
-    draw.line([(40, y), (width - 40, y)], fill=pal["border"], width=1)
+    # Верхняя декоративная полоса
+    y = 35
+    draw.line([(40, y), (width - 40, y)], fill=pal["accent"], width=1)
+    y += 5
+    
+    # Заголовок с вензелем
+    title_text = "✦ LITRA PACKS ✦"
+    draw.text((width//2, 28), title_text, fill=pal["accent"], font=font_title, anchor="mt")
+    
+    y = 55
+    draw.line([(40, y), (width - 40, y)], fill=pal["accent"], width=1)
     y += 25
 
+    # Портрет в старинной рамке
     portrait = None
+    portrait_y = 80
+    portrait_size = 150
+    
     if is_legendary:
         portrait = load_portrait(hero)
         if portrait:
-            portrait = portrait.resize((130, 130), Image.Resampling.LANCZOS)
-            mask = Image.new('L', (130, 130), 0)
+            portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
+            # Круглая маска
+            mask = Image.new('L', (portrait_size, portrait_size), 0)
             mask_draw = ImageDraw.Draw(mask)
-            mask_draw.ellipse((0, 0, 130, 130), fill=255)
+            mask_draw.ellipse((0, 0, portrait_size, portrait_size), fill=255)
             portrait.putalpha(mask)
-            x = (width - 130) // 2
-            y_portrait = 55
-            img.paste(portrait, (x, y_portrait), portrait)
-            draw.ellipse([(x-4, y_portrait-4), (x+134, y_portrait+134)], outline=pal["border"], width=3)
-            name_y = 215
+            
+            x = (width - portrait_size) // 2
+            img.paste(portrait, (x, portrait_y), portrait)
+            
+            # Овальная рамка вокруг портрета
+            draw.ellipse([(x - 6, portrait_y - 6), (x + portrait_size + 6, portrait_y + portrait_size + 6)], 
+                         outline=pal["border"], width=3)
+            draw.ellipse([(x - 3, portrait_y - 3), (x + portrait_size + 3, portrait_y + portrait_size + 3)], 
+                         outline=pal["accent"], width=1)
+            
+            name_y = portrait_y + portrait_size + 30
         else:
-            name_y = height // 2 - 40
+            name_y = 280
     else:
-        name_y = height // 2 - 40
+        name_y = 280
 
+    # Имя героя (на стилизованной ленте)
     name = hero["name"]
+    name_bg = Image.new('RGBA', (len(name) * 22 + 40, 50), (pal["name_bg"][0], pal["name_bg"][1], pal["name_bg"][2], 180))
+    name_draw = ImageDraw.Draw(name_bg)
+    name_draw.rectangle([(0, 0), (len(name) * 22 + 40, 50)], outline=pal["border"], width=1)
+    
+    # Сохраняем ленту на основное изображение
+    x = (width - (len(name) * 22 + 40)) // 2
+    img.paste(name_bg, (x, name_y - 10), name_bg)
+    
+    # Тень для имени
     for dx, dy in [(-2,-2), (-2,2), (2,-2), (2,2)]:
         draw.text((width//2 + dx, name_y + dy), name, fill=(0, 0, 0), font=font_name, anchor="mt")
     draw.text((width//2, name_y), name, fill=pal["text"], font=font_name, anchor="mt")
 
-    y = name_y + 45
-    draw.line([(30, y), (width - 30, y)], fill=pal["accent"], width=1)
-    y += 30
+    y = name_y + 50
+    draw.line([(40, y), (width - 40, y)], fill=pal["accent"], width=1)
+    y += 25
 
+    # Информация о герое
     if is_legendary and portrait:
         years = get_years(hero.get("author", ""))
         draw.text((width//2, y), years, fill=pal["sub"], font=font_years, anchor="mt")
-        y += 25
+        y += 28
         
         quote = get_random_quote(hero.get("author", ""))
         words = quote.split()
         lines = []
         current_line = ""
         for word in words:
-            if len(current_line) + len(word) + 1 <= 30:
+            if len(current_line) + len(word) + 1 <= 32:
                 current_line += word + " "
             else:
                 lines.append(current_line.strip())
@@ -189,32 +307,44 @@ def create_hero_card(hero):
         if current_line:
             lines.append(current_line.strip())
         
-        for i, line in enumerate(lines):
-            draw.text((width//2, y + i * 18), f'"{line}"', fill=pal["sub"], font=font_quote, anchor="mt")
+        # Кавычки в стиле XIX века
+        if lines:
+            draw.text((width//2 - 10, y), "«", fill=pal["sub"], font=font_quote, anchor="mt")
+            for i, line in enumerate(lines[:3]):
+                draw.text((width//2 + 5, y + i * 20), line, fill=pal["sub"], font=font_quote, anchor="lt")
+            draw.text((width//2 - 10, y + min(len(lines), 3) * 20 - 5), "»", fill=pal["sub"], font=font_quote, anchor="mt")
         
-        y += len(lines) * 18 + 20
-        footer_y = height - 16
+        y += len(lines[:3]) * 20 + 30
     else:
+        # Для нелегендарных — книга и автор
         book = hero["book"]
-        if len(book) > 25:
-            book = book[:22] + "..."
+        if len(book) > 28:
+            book = book[:25] + "..."
         draw.text((width//2, y), f'"{book}"', fill=pal["sub"], font=font_book, anchor="mt")
-        y += 24
+        y += 28
         author = hero["author"]
-        draw.text((width//2, y), author, fill=pal["sub"], font=font_author, anchor="mt")
-        y += 26
-        footer_y = height - 16
+        draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
+        y += 35
 
+    # Редкость с декоративным элементом
     rare_labels = {"легендарный": "ЛЕГЕНДАРНЫЙ", "эпический": "ЭПИЧЕСКИЙ", "редкий": "РЕДКИЙ", "обычный": "ОБЫЧНЫЙ"}
     rare_text = rare_labels.get(rarity, "ОБЫЧНЫЙ")
     
-    if is_legendary:
-        draw.text((width//2, y - 1), rare_text, fill=(255, 215, 0, 100), font=font_rare, anchor="mt")
-    draw.text((width//2, y), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
+    # Декоративная печать под редкостью
+    seal_x = width // 2 - 40
+    seal_y = y - 5
+    draw.ellipse([(seal_x, seal_y), (seal_x + 80, seal_y + 30)], outline=pal["seal"], width=1)
+    draw.text((width//2, y + 5), rare_text, fill=pal["rare"], font=font_rare, anchor="mt")
+    
+    y += 45
+    draw.line([(40, y), (width - 40, y)], fill=pal["accent"], width=1)
+    
+    # Футер
+    footer_y = height - 20
+    draw.text((width//2, footer_y), "С любовью к литературе", fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 150), font=font_footer, anchor="mt")
 
-    draw.text((width//2, footer_y), "С любовью к литературе", fill=(80, 75, 65), font=font_footer, anchor="mt")
-
+    # Сохранение
     bio = io.BytesIO()
-    img.save(bio, format='JPEG', quality=85, optimize=True)
+    img.save(bio, format='JPEG', quality=92, optimize=True)
     bio.seek(0)
     return bio
