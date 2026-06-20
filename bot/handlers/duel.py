@@ -110,18 +110,23 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Для дуэли нужно *3 героя* в коллекции."
     )
     
-    if query:
-        await query.edit_message_text(
-            text,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    try:
+        if query:
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            await update.message.reply_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            return
+        raise e
 
 
 async def duel_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,7 +150,11 @@ async def duel_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     available_users = [u for u in all_users if u["user_id"] != user_id]
     
     if not available_users:
-        await query.edit_message_text("😴 Нет других игроков. Попробуй позже.")
+        try:
+            await query.edit_message_text("😴 Нет других игроков. Попробуй позже.")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                raise
         return
     
     keyboard = []
@@ -167,11 +176,15 @@ async def duel_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = "👤 *Выбери друга для дуэли:*\n\n_Показаны первые 20 пользователей_"
     
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        if "Message is not modified" not in str(e):
+            raise
 
 
 async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,12 +197,20 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
     friend_id = int(parts[1])
     
     if friend_id in user_duel:
-        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
+        try:
+            await query.edit_message_text("❌ Этот игрок уже в дуэли.")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                raise
         return
     
     friend_collection = get_collection(friend_id)
     if len(friend_collection) < 3:
-        await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
+        try:
+            await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                raise
         return
     
     await start_duel_with_opponent(update, context, user_id, query.message.chat_id, "friend", friend_id)
@@ -252,14 +273,22 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
     if opponent_id in user_duel:
-        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
+        try:
+            await query.edit_message_text("❌ Этот игрок уже в дуэли.")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                raise
         return
     
     user_collection = get_collection(user_id)
     opponent_collection = get_collection(opponent_id)
     
     if len(user_collection) < 3 or len(opponent_collection) < 3:
-        await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
+        try:
+            await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                raise
         return
     
     await proceed_to_hero_selection(update, context, user_id, query.message.chat_id, opponent_id, initiator=opponent_id)
@@ -269,7 +298,11 @@ async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отказ от дуэли с другом"""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("❌ Ты отказался от дуэли.")
+    try:
+        await query.edit_message_text("❌ Ты отказался от дуэли.")
+    except Exception as e:
+        if "Message is not modified" not in str(e):
+            raise
 
 
 async def proceed_to_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, opponent_id: int, initiator: int = None):
@@ -383,7 +416,8 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
     except Exception as e:
-        print(f"⚠️ Ошибка при показе выбора героев: {e}")
+        if "Message is not modified" not in str(e):
+            print(f"⚠️ Ошибка при показе выбора героев: {e}")
 
 
 async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
