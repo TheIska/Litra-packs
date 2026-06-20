@@ -78,13 +78,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки 'Сообщить об ошибке'"""
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except Exception:
+        pass
     
     text = (
-        "📩 *Сообщить об ошибке*\n\n"
+        "📩 Сообщить об ошибке\n\n"
         "Если ты нашёл ошибку в боте или хочешь предложить идею, напиши мне напрямую:\n\n"
-        f"👤 *Разработчик:* @your_username\n\n"
-        "_Или просто отправь сообщение с описанием проблемы — я увижу!_"
+        "👤 Разработчик: @your_username\n\n"
+        "Или просто отправь сообщение с описанием проблемы — я увижу!"
     )
     
     keyboard = [
@@ -93,13 +96,13 @@ async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(
         text,
-        parse_mode="Markdown",
+        parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
 async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересылает сообщение пользователя админу (если бот получает текст)"""
+    """Пересылает сообщение пользователя админу"""
     if update.message and update.message.text:
         user = update.effective_user
         user_name = user.first_name or "Пользователь"
@@ -107,7 +110,7 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = f"@{user.username}" if user.username else "без username"
         
         message_text = (
-            f"📩 *Новое сообщение от пользователя*\n\n"
+            f"📩 Новое сообщение от пользователя\n\n"
             f"👤 Имя: {user_name}\n"
             f"🆔 ID: {user_id}\n"
             f"🔗 {username}\n\n"
@@ -118,7 +121,7 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
                 text=message_text,
-                parse_mode="Markdown"
+                parse_mode=None
             )
             await update.message.reply_text(
                 "✅ Сообщение отправлено разработчику! Спасибо за обратную связь."
@@ -145,7 +148,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_photo = False
 
     help_text = (
-        "❓ *Список команд*\n\n"
+        "❓ Список команд\n\n"
         "/start — Главное меню\n"
         "/help — Эта справка\n"
         "/duel — Начать дуэль\n"
@@ -153,7 +156,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/quiz — Викторина\n"
         "/stopquiz — Завершить викторину\n"
         "/addcoins — (админ) Добавить монеты\n\n"
-        "📌 *Как играть*\n"
+        "📌 Как играть\n"
         "1. Бесплатный пак каждые 3 часа.\n"
         "2. Покупай паки за монеты с лучшими шансами.\n"
         "3. Участвуй в дуэлях и зарабатывай монеты.\n"
@@ -172,14 +175,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=help_text,
-                parse_mode="Markdown",
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
             try:
                 await query.edit_message_text(
                     help_text,
-                    parse_mode="Markdown",
+                    parse_mode=None,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
             except Exception:
@@ -187,7 +190,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             help_text,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -201,7 +204,7 @@ async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     user = get_user(user_id)
     
-    msg = f"💰 *Твой баланс:* {user['coins']} монет.\n\nЗарабатывай монеты, участвуя в дуэлях (победа +10, поражение -5) и открывая паки!"
+    msg = f"💰 Твой баланс: {user['coins']} монет.\n\nЗарабатывай монеты, участвуя в дуэлях (победа +10, поражение -5) и открывая паки!"
     keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
     
     if query.message.photo:
@@ -212,14 +215,14 @@ async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=msg,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
         try:
             await query.edit_message_text(
                 msg,
-                parse_mode="Markdown",
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except Exception:
@@ -244,7 +247,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
     ]
     
-    msg = f"🛒 *Магазин паков*\n\n💰 Твой баланс: *{user['coins']}* монет\n\nВыбери, что хочешь открыть:"
+    msg = f"🛒 Магазин паков\n\n💰 Твой баланс: {user['coins']} монет\n\nВыбери, что хочешь открыть:"
     
     if query.message.photo:
         try:
@@ -254,14 +257,14 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=msg,
-            parse_mode="Markdown",
+            parse_mode=None,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
         try:
             await query.edit_message_text(
                 msg,
-                parse_mode="Markdown",
+                parse_mode=None,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except Exception:
