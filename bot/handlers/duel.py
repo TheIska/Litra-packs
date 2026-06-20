@@ -1,60 +1,4 @@
-import logging
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
-from .config import BOT_TOKEN
-from .database import init_db
-from .handlers.start import start, help_command, show_coins, shop
-from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
-from .handlers.collection import show_collection
-from .handlers.duel import (
-    duel_command,
-    answer_callback,
-    stop_duel_command,
-    handle_hero_selection,
-    handle_invite_link,
-    duel_random,
-    duel_friend,
-    duel_friend_select,
-    duel_bot,
-    duel_accept,
-    duel_decline,
-    duel_invite,
-    copy_link,
-    share_link,
-)
-from .handlers.admin import add_coins_command
-from .web.server import keep_alive
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-def main():
-    init_db()
-    keep_alive()
-
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    # ========== КОМАНДЫ ==========
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("start", handle_invite_link))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("duel", duel_command))
-    app.add_handler(CommandHandler("stopduel", stop_duel_command))
-    app.add_handler(CommandHandler("addcoins", add_coins_command))
-
-    # ========== CALLBACK'И МЕНЮ ==========
-    app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
-    app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
-    app.add_handler(CallbackQueryHandler(show_coins, pattern="^coins$"))
-
-    # ========== ПАКИ ==========
-    app.add_handler(CallbackQueryHandler(free_pack, pattern="^free_pack$"))
-    app.add_handler(CallbackQueryHandler(small_pack, pattern="^small_pack$"))
-    app.add_handler(CallbackQueryHandler(medium_pack, pattern="^medium_pack$"))
-    app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
-
-   import random
+import random
 import asyncio
 import hashlib
 import time
@@ -78,7 +22,6 @@ BONUSES = {
     "легендарный": {"name": "Автопобеда", "code": "b4"},
 }
 
-# Шанс спасти неправильный ответ (в процентах)
 SAVE_CHANCES = {
     "легендарный": 12,
     "эпический": 9,
@@ -86,7 +29,6 @@ SAVE_CHANCES = {
     "обычный": 3,
 }
 
-# Влияние на вопросы
 WORK_MULTIPLIERS = {
     "легендарный": 3,
     "эпический": 2,
@@ -96,7 +38,6 @@ WORK_MULTIPLIERS = {
 
 
 def generate_invite_code(user_id: int) -> str:
-    """Генерирует уникальный код приглашения"""
     raw = f"{user_id}_{time.time()}_{random.randint(1000,9999)}"
     code = hashlib.md5(raw.encode()).hexdigest()[:8].upper()
     invite_codes[code] = {
@@ -107,20 +48,19 @@ def generate_invite_code(user_id: int) -> str:
 
 
 def get_bot_name() -> str:
-    """Возвращает имя бота (для ссылки)"""
-    return "LiteraPacksBot"  # ЗАМЕНИ НА СВОЁ
+    return "LiteraPacksBot"
 
 
 def get_weighted_questions(selected_heroes, collection, all_questions, count=5):
     work_weights = defaultdict(int)
-    
+
     for hero_key in selected_heroes:
         hero = collection[hero_key]
         rarity = hero.get("rarity", "обычный")
         work = hero.get("book", "")
         if work:
             work_weights[work] += WORK_MULTIPLIERS.get(rarity, 1)
-    
+
     weighted_questions = []
     for q in all_questions:
         work = q.get("work", "")
@@ -128,17 +68,17 @@ def get_weighted_questions(selected_heroes, collection, all_questions, count=5):
             work = extract_work(q.get("text", ""))
         weight = work_weights.get(work, 1)
         weighted_questions.append((q, weight))
-    
+
     if count >= len(all_questions):
         return random.sample(all_questions, len(all_questions))
-    
+
     pool = []
     for q, weight in weighted_questions:
         pool.extend([q] * min(weight, 20))
-    
+
     if len(pool) > 1000:
         pool = pool[:1000]
-    
+
     selected = []
     available = pool.copy()
     for _ in range(min(count, len(all_questions))):
@@ -147,13 +87,13 @@ def get_weighted_questions(selected_heroes, collection, all_questions, count=5):
         chosen = random.choice(available)
         selected.append(chosen)
         available = [q for q in available if q != chosen]
-    
+
     while len(selected) < count:
         remaining = [q for q in all_questions if q not in selected]
         if not remaining:
             break
         selected.append(random.choice(remaining))
-    
+
     return selected
 
 
@@ -186,7 +126,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🤖 С ботом", callback_data="duel_bot")],
         [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
     ]
-    
+
     text = (
         f"⚔️ *Выбери тип дуэли*\n\n"
         f"🎲 *Случайный соперник* — найди случайного игрока\n"
@@ -195,7 +135,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🤖 *С ботом* — сражайся против ИИ\n\n"
         f"Для дуэли нужно *3 героя* в коллекции."
     )
-    
+
     try:
         if query:
             await query.edit_message_text(
@@ -219,23 +159,22 @@ async def duel_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     collection = get_collection(user_id)
     if len(collection) < 3:
         await query.edit_message_text("❌ У тебя меньше 3 героев. Открой паки!")
         return
-    
+
     code = generate_invite_code(user_id)
     bot_name = get_bot_name()
-    
     invite_link = f"https://t.me/{bot_name}?start=duel_{code}"
-    
+
     keyboard = [
         [InlineKeyboardButton("📋 Скопировать ссылку", callback_data=f"copy_link|{invite_link}")],
         [InlineKeyboardButton("📤 Поделиться", callback_data=f"share_link|{invite_link}")],
         [InlineKeyboardButton("🔙 Назад", callback_data="duel")],
     ]
-    
+
     text = (
         f"🔗 *Пригласи друга на дуэль!*\n\n"
         f"Отправь другу эту ссылку:\n"
@@ -244,7 +183,7 @@ async def duel_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"После перехода по ссылке друг сможет принять вызов.\n\n"
         f"_Нажми кнопку ниже, чтобы скопировать ссылку_"
     )
-    
+
     await query.edit_message_text(
         text,
         parse_mode="Markdown",
@@ -258,7 +197,7 @@ async def copy_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     parts = data.split("|")
     link = parts[1]
-    
+
     await query.edit_message_text(
         f"🔗 Ссылка скопирована! Отправь её другу:\n\n`{link}`\n\n⚠️ Ссылка действует 5 минут.",
         parse_mode="Markdown"
@@ -271,12 +210,12 @@ async def share_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     parts = data.split("|")
     link = parts[1]
-    
+
     keyboard = [
         [InlineKeyboardButton("📋 Скопировать ссылку", callback_data=f"copy_link|{link}")],
         [InlineKeyboardButton("🔙 Назад", callback_data="duel")],
     ]
-    
+
     await query.edit_message_text(
         f"🔗 *Поделись ссылкой с другом:*\n\n`{link}`\n\n"
         f"Или отправь этот текст:\n"
@@ -291,52 +230,52 @@ async def share_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return
-    
+
     start_param = context.args[0]
     if not start_param.startswith("duel_"):
         return
-    
+
     code = start_param.replace("duel_", "")
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    
+
     invite_data = invite_codes.get(code)
     if not invite_data:
         await update.message.reply_text("❌ Ссылка недействительна или истекла.")
         return
-    
+
     if time.time() - invite_data["created_at"] > 300:
         invite_codes.pop(code, None)
         await update.message.reply_text("❌ Ссылка истекла (действует 5 минут).")
         return
-    
+
     inviter_id = invite_data["inviter"]
-    
+
     if user_id == inviter_id:
         await update.message.reply_text("❌ Нельзя пригласить самого себя!")
         return
-    
+
     if inviter_id in user_duel:
         await update.message.reply_text("❌ Игрок, который тебя пригласил, уже в дуэли.")
         return
-    
+
     inviter_collection = get_collection(inviter_id)
     user_collection = get_collection(user_id)
-    
+
     if len(inviter_collection) < 3:
         await update.message.reply_text("❌ У пригласившего меньше 3 героев.")
         return
-    
+
     if len(user_collection) < 3:
         await update.message.reply_text("❌ У тебя меньше 3 героев. Открой паки!")
         return
-    
+
     invite_codes.pop(code, None)
-    
+
     await proceed_to_hero_selection(
-        update, context, 
-        user_id, chat_id, 
-        inviter_id, 
+        update, context,
+        user_id, chat_id,
+        inviter_id,
         initiator=inviter_id,
         invited=True
     )
@@ -347,17 +286,17 @@ async def duel_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     all_users = get_all_users()
     available_users = [u for u in all_users if u["user_id"] != user_id]
-    
+
     if not available_users:
         try:
             await query.edit_message_text("😴 Нет других игроков. Попробуй позже.")
         except Exception:
             pass
         return
-    
+
     keyboard = []
     for user in available_users[:20]:
         try:
@@ -365,18 +304,18 @@ async def duel_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = chat.first_name or f"ID: {user['user_id']}"
         except:
             name = f"ID: {user['user_id']}"
-        
+
         collection = get_collection(user["user_id"])
         hero_count = len(collection)
         keyboard.append([InlineKeyboardButton(
             f"👤 {name} ({hero_count} героев)",
             callback_data=f"duel_friend_select|{user['user_id']}"
         )])
-    
+
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="duel")])
-    
+
     text = "👤 *Выбери друга для дуэли:*\n\n_Показаны первые 20 пользователей_"
-    
+
     try:
         await query.edit_message_text(
             text,
@@ -395,21 +334,21 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = query.from_user.id
     friend_id = int(parts[1])
     chat_id = query.message.chat_id
-    
+
     if friend_id in user_duel:
         await query.edit_message_text("❌ Этот игрок уже в дуэли.")
         return
-    
+
     friend_collection = get_collection(friend_id)
     if len(friend_collection) < 3:
         await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
         return
-    
+
     keyboard = [
         [InlineKeyboardButton("✅ Принять дуэль", callback_data=f"duel_accept|{user_id}")],
         [InlineKeyboardButton("❌ Отказаться", callback_data="duel_decline")],
     ]
-    
+
     await context.bot.send_message(
         friend_id,
         f"⚔️ *{update.effective_user.first_name} хочет вызвать тебя на дуэль!*\n\n"
@@ -417,7 +356,7 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    
+
     await query.edit_message_text("⏳ Отправлен запрос сопернику. Ожидай ответа...")
 
 
@@ -429,22 +368,22 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     opponent_id = int(parts[1])
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     if opponent_id in user_duel:
         await query.edit_message_text("❌ Этот игрок уже в дуэли.")
         return
-    
+
     user_collection = get_collection(user_id)
     opponent_collection = get_collection(opponent_id)
-    
+
     if len(user_collection) < 3 or len(opponent_collection) < 3:
         await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
         return
-    
+
     await proceed_to_hero_selection(
-        update, context, 
-        user_id, chat_id, 
-        opponent_id, 
+        update, context,
+        user_id, chat_id,
+        opponent_id,
         initiator=opponent_id,
         invited=False
     )
@@ -461,7 +400,7 @@ async def duel_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "random")
 
 
@@ -470,12 +409,12 @@ async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     collection = get_collection(user_id)
     if len(collection) < 3:
         await context.bot.send_message(chat_id, "❌ У тебя меньше 3 героев. Открой паки!")
         return
-    
+
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "bot")
 
 
@@ -488,64 +427,63 @@ async def proceed_to_hero_selection(update: Update, context: ContextTypes.DEFAUL
         "initiator": initiator,
         "invited": invited,
     }
-    
+
     if invited:
         await context.bot.send_message(
             opponent_id,
             f"✅ Твой друг принял приглашение на дуэль!\nВыбирайте героев..."
         )
-    
+
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "friend")
 
 
 async def show_hero_selection_for_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, duel_type: str):
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
-    
+
     if user_id not in user_selection:
         user_selection[user_id] = {
             "selected": [],
             "page": 0,
             "duel_type": duel_type,
         }
-    
+
     user_data = user_selection[user_id]
     selected = user_data.get("selected", [])
     page = user_data.get("page", 0)
-    
+
     if len(hero_keys) <= 3:
         user_selection[user_id]["selected"] = hero_keys.copy()
         await start_duel_after_selection(update, context, user_id)
         return
-    
+
     per_page = 5
     total_pages = (len(hero_keys) + per_page - 1) // per_page
     start_idx = page * per_page
     end_idx = min(start_idx + per_page, len(hero_keys))
-    
+
     keyboard = []
-    
+
     for i in range(start_idx, end_idx):
         key = hero_keys[i]
         hero = collection[key]
         rarity = hero.get("rarity", "обычный")
         is_selected = key in selected
-        
+
         rarity_emoji = {
             "легендарный": "👑",
             "эпический": "⭐",
             "редкий": "🔵",
             "обычный": "📘"
         }.get(rarity, "📘")
-        
+
         selected_emoji = "✅" if is_selected else "⬜"
-        mult = WORK_MULTIPLIERS.get(rarity, 1)
         save_chance = SAVE_CHANCES.get(rarity, 0)
         keyboard.append([InlineKeyboardButton(
             f"{selected_emoji} {rarity_emoji} {hero['name'][:15]} ({save_chance}%)",
             callback_data=f"hsel|{i}"
         )])
-    
+
     nav_row = []
     if page > 0:
         nav_row.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"hpage|{page-1}"))
@@ -553,20 +491,20 @@ async def show_hero_selection_for_duel(update: Update, context: ContextTypes.DEF
         nav_row.append(InlineKeyboardButton("➡️ Вперед", callback_data=f"hpage|{page+1}"))
     if nav_row:
         keyboard.append(nav_row)
-    
+
     if total_pages > 1:
         keyboard.append([InlineKeyboardButton(
             f"📄 Страница {page+1}/{total_pages}",
             callback_data="noop"
         )])
-    
+
     keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="startduel")])
     keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
-    
+
     selected_count = len(selected)
-    
+
     total_save_chance = sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in selected)
-    
+
     bonus_text = ""
     if selected:
         work_weights = defaultdict(int)
@@ -576,14 +514,14 @@ async def show_hero_selection_for_duel(update: Update, context: ContextTypes.DEF
             work = hero.get("book", "")
             if work:
                 work_weights[work] += WORK_MULTIPLIERS.get(rarity, 1)
-        
+
         if work_weights:
             bonus_text = "\n\n📚 *Бонусы к вопросам:*"
             for work, weight in work_weights.items():
                 bonus_text += f"\n• {work}: x{weight}"
-        
+
         bonus_text += f"\n\n🔄 *Шанс спасения:* {total_save_chance}% (один раз за дуэль)"
-    
+
     text = (
         f"⚔️ *Выбор героев для дуэли*\n\n"
         f"Выбери *3 героя*, которые будут участвовать в дуэли.\n"
@@ -593,7 +531,7 @@ async def show_hero_selection_for_duel(update: Update, context: ContextTypes.DEF
         f"👑12%  ⭐9%  🔵6%  📘3%"
         f"{bonus_text}"
     )
-    
+
     try:
         if update.callback_query:
             await update.callback_query.edit_message_text(
@@ -619,26 +557,26 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer()
     except Exception:
         return
-    
+
     data = query.data
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    
+
     if data.startswith("hsel|"):
         try:
             hero_idx = int(data.split("|")[1])
         except (IndexError, ValueError):
             return
-        
+
         collection = get_collection(user_id)
         hero_keys = list(collection.keys())
         if hero_idx >= len(hero_keys):
             return
-        
+
         hero_key = hero_keys[hero_idx]
         user_data = user_selection.get(user_id, {"selected": [], "page": 0})
         selected = user_data.get("selected", [])
-        
+
         if hero_key in selected:
             selected.remove(hero_key)
         else:
@@ -646,29 +584,29 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.answer("❌ Ты уже выбрал 3 героев!", show_alert=True)
                 return
             selected.append(hero_key)
-        
+
         user_selection[user_id]["selected"] = selected
         await show_hero_selection_for_duel(update, context, user_id, chat_id, user_data.get("duel_type", "random"))
-    
+
     elif data.startswith("hpage|"):
         try:
             page = int(data.split("|")[1])
         except (IndexError, ValueError):
             return
-        
+
         user_selection[user_id]["page"] = page
         await show_hero_selection_for_duel(update, context, user_id, chat_id, user_selection[user_id].get("duel_type", "random"))
-    
+
     elif data == "startduel":
         user_data = user_selection.get(user_id, {"selected": [], "page": 0})
         selected = user_data.get("selected", [])
-        
+
         if len(selected) != 3:
             await query.answer("❌ Выбери ровно 3 героев!", show_alert=True)
             return
-        
+
         await start_duel_after_selection(update, context, user_id)
-    
+
     elif data == "main_menu":
         user_selection.pop(user_id, None)
         from .start import start
@@ -681,61 +619,61 @@ async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAU
     selected_heroes = user_data.get("selected", [])
     duel_type = user_data.get("duel_type", "random")
     opponent_id = user_data.get("opponent")
-    
+
     if len(selected_heroes) != 3:
         return
-    
+
     if duel_type == "bot":
         await start_bot_duel(update, context, user_id, selected_heroes)
         return
-    
+
     if duel_type == "friend" and opponent_id:
         p2_collection = get_collection(opponent_id)
         p2_keys = list(p2_collection.keys())
-        
+
         rarity_order = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
         sorted_p2_keys = sorted(p2_keys, key=lambda k: rarity_order.get(p2_collection[k].get("rarity", "обычный"), 4))
         p2_chosen = sorted_p2_keys[:3] if len(sorted_p2_keys) >= 3 else random.sample(p2_keys, 3)
-        
+
         await start_duel(update, context, user_id, opponent_id, selected_heroes, p2_chosen)
         return
-    
+
     opponent_id = get_opponent(user_id)
     if not opponent_id:
         user_selection.pop(user_id, None)
         await context.bot.send_message(user_id, "😴 Нет других игроков. Попробуй позже.")
         return
-    
+
     if opponent_id in user_duel:
         user_selection.pop(user_id, None)
         await context.bot.send_message(user_id, "Соперник уже в игре.")
         return
-    
+
     p2_collection = get_collection(opponent_id)
     p2_keys = list(p2_collection.keys())
     if len(p2_keys) < 3:
         user_selection.pop(user_id, None)
         await context.bot.send_message(user_id, "❌ У соперника меньше 3 героев.")
         return
-    
+
     rarity_order = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
     sorted_p2_keys = sorted(p2_keys, key=lambda k: rarity_order.get(p2_collection[k].get("rarity", "обычный"), 4))
     p2_chosen = sorted_p2_keys[:3] if len(sorted_p2_keys) >= 3 else random.sample(p2_keys, 3)
-    
+
     await start_duel(update, context, user_id, opponent_id, selected_heroes, p2_chosen)
 
 
 async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, opponent_id: int, p1_chosen: list, p2_chosen: list):
     collection = get_collection(user_id)
     p2_collection = get_collection(opponent_id)
-    
+
     questions = get_weighted_questions(p1_chosen, collection, QUESTIONS, 5)
-    
+
     p1_save_chance = sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in p1_chosen)
     p2_save_chance = sum(SAVE_CHANCES.get(p2_collection[k].get("rarity", "обычный"), 0) for k in p2_chosen)
-    
+
     duel_id = f"{user_id}_{opponent_id}_{random.randint(1000,9999)}"
-    
+
     duels[duel_id] = {
         "player1": user_id,
         "player2": opponent_id,
@@ -760,13 +698,13 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         "p1_save_used": False,
         "p2_save_used": False,
     }
-    
+
     user_duel[user_id] = duel_id
     user_duel[opponent_id] = duel_id
-    
+
     p1_names = [collection[k]['name'] for k in p1_chosen]
     p2_names = [p2_collection[k]['name'] for k in p2_chosen]
-    
+
     await context.bot.send_message(
         user_id,
         f"⚔️ *Дуэль началась!*\n"
@@ -776,7 +714,7 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         f"За каждый правильный ответ — 1 очко.",
         parse_mode="Markdown"
     )
-    
+
     await context.bot.send_message(
         opponent_id,
         f"⚔️ *Дуэль началась!*\n"
@@ -786,23 +724,23 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         f"За каждый правильный ответ — 1 очко.",
         parse_mode="Markdown"
     )
-    
+
     user_selection.pop(user_id, None)
     await ask_question(update, context, duel_id)
 
 
 async def start_bot_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, p1_chosen: list):
     collection = get_collection(user_id)
-    
+
     from ..models.hero import HEROES
     bot_heroes = random.sample(HEROES, 3)
-    
+
     questions = get_weighted_questions(p1_chosen, collection, QUESTIONS, 5)
-    
+
     p1_save_chance = sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in p1_chosen)
-    
+
     duel_id = f"{user_id}_bot_{random.randint(1000,9999)}"
-    
+
     duels[duel_id] = {
         "player1": user_id,
         "player2": "bot",
@@ -828,12 +766,12 @@ async def start_bot_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         "p1_save_used": False,
         "p2_save_used": False,
     }
-    
+
     user_duel[user_id] = duel_id
-    
+
     p1_names = [collection[k]['name'] for k in p1_chosen]
     p2_names = [h['name'] for h in bot_heroes]
-    
+
     await context.bot.send_message(
         user_id,
         f"🤖 *Дуэль с ботом началась!*\n"
@@ -846,7 +784,7 @@ async def start_bot_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         f"🔄 При ошибке есть шанс на спасение (один раз)",
         parse_mode="Markdown"
     )
-    
+
     user_selection.pop(user_id, None)
     await ask_question(update, context, duel_id)
 
@@ -884,7 +822,7 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE, duel_
     work = question.get("work", "")
     if not work:
         work = extract_work(question.get("text", ""))
-    
+
     work_text = f"\n📖 *{work}*" if work else ""
 
     text = (
@@ -924,9 +862,9 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
     except Exception:
         return
-    
+
     data = query.data
-    
+
     if data.startswith("ans|"):
         parts = data.split("|")
         duel_id = parts[1]
@@ -1020,25 +958,23 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await send_correct_answer_and_continue(update, context, duel_id)
 
         else:
-            # Игрок ответил неправильно — проверяем шанс спасения
             save_chance = duel.get(f"{player_key}_save_chance", 0)
             save_used = duel.get(f"{player_key}_save_used", False)
-            
+
             if not save_used and save_chance > 0 and random.random() * 100 < save_chance:
-                # Шанс сработал! Спасаем ответ
                 duel[f"{player_key}_score"] += 1
                 duel["correct_answered"] = True
                 duel["question_active"] = False
                 duel["waiting_for_answer"] = False
                 duel[f"{player_key}_save_used"] = True
-                
+
                 await query.edit_message_text(
                     f"🔄 *Спасение!*\n"
                     f"Твой ответ был неправильным, но герои спасли тебя!\n"
                     f"✅ +1 очко! (шанс {save_chance}%)",
                     parse_mode="Markdown"
                 )
-                
+
                 if is_bot:
                     await context.bot.send_message(
                         duel["player1"],
@@ -1050,11 +986,10 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             player_id_other,
                             f"🔄 Соперник ошибся, но его герои спасли его! Он получает +1 очко."
                         )
-                
+
                 await send_correct_answer_and_continue(update, context, duel_id)
                 return
-            
-            # Если шанс не сработал или уже использован
+
             try:
                 await query.edit_message_text("❌ *Неправильно.*", parse_mode="Markdown")
             except Exception:

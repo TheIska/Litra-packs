@@ -10,11 +10,16 @@ from .handlers.duel import (
     answer_callback,
     stop_duel_command,
     handle_hero_selection,
+    handle_invite_link,
     duel_random,
     duel_friend,
     duel_friend_select,
     duel_bot,
     duel_accept,
+    duel_decline,
+    duel_invite,
+    copy_link,
+    share_link,
 )
 from .handlers.admin import add_coins_command
 from .web.server import keep_alive
@@ -32,6 +37,7 @@ def main():
 
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start", handle_invite_link))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
     app.add_handler(CommandHandler("stopduel", stop_duel_command))
@@ -58,7 +64,10 @@ def main():
     app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\|"))
     app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
     app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
-    app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel_decline$"))
+    app.add_handler(CallbackQueryHandler(duel_decline, pattern="^duel_decline$"))
+    app.add_handler(CallbackQueryHandler(duel_invite, pattern="^duel_invite$"))
+    app.add_handler(CallbackQueryHandler(copy_link, pattern="^copy_link\|"))
+    app.add_handler(CallbackQueryHandler(share_link, pattern="^share_link\|"))
     
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
