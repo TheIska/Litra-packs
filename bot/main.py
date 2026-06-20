@@ -53,9 +53,11 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))
     
     # ========== ВЫБОР ГЕРОЕВ ==========
-    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hero\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hsel\|"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hpage\|"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^startduel$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
 
     print("🤖 Бот запущен!")
     app.run_polling()

@@ -37,38 +37,66 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id, "❌ У тебя меньше 3 героев. Открой паки!")
         return
 
+    user_selection[user_id] = {
+        "selected": [],
+        "page": 0
+    }
     await show_hero_selection(update, context, user_id, chat_id)
 
 
 async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
-    """Показывает интерфейс выбора героев"""
+    """Показывает интерфейс выбора героев с пагинацией по 5 героев"""
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
     
     if len(hero_keys) <= 3:
-        user_selection[user_id] = hero_keys.copy()
+        user_selection[user_id]["selected"] = hero_keys.copy()
         await start_duel_after_selection(update, context, user_id)
         return
     
-    if user_id not in user_selection:
-        user_selection[user_id] = []
+    user_data = user_selection.get(user_id, {"selected": [], "page": 0})
+    selected = user_data.get("selected", [])
+    page = user_data.get("page", 0)
+    
+    # Всего страниц
+    per_page = 5
+    total_pages = (len(hero_keys) + per_page - 1) // per_page
+    start_idx = page * per_page
+    end_idx = min(start_idx + per_page, len(hero_keys))
     
     keyboard = []
     
-    # Создаём кнопки с номерами (1-20)
-    for i, key in enumerate(hero_keys[:20], 1):
+    # Показываем героев на текущей странице (по 5)
+    for i in range(start_idx, end_idx):
+        key = hero_keys[i]
         hero = collection[key]
-        selected = key in user_selection[user_id]
-        emoji = "✅" if selected else "⬜"
+        is_selected = key in selected
+        emoji = "✅" if is_selected else "⬜"
         keyboard.append([InlineKeyboardButton(
-            f"{i}. {emoji} {hero['name'][:20]}",
-            callback_data=f"hero{i}"  # hero1, hero2, ...
+            f"{emoji} {hero['name'][:25]}",
+            callback_data=f"hsel|{i}"
+        )])
+    
+    # Кнопки навигации
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"hpage|{page-1}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("➡️ Вперед", callback_data=f"hpage|{page+1}"))
+    if nav_row:
+        keyboard.append(nav_row)
+    
+    # Информация о странице
+    if total_pages > 1:
+        keyboard.append([InlineKeyboardButton(
+            f"📄 Страница {page+1}/{total_pages}",
+            callback_data="noop"
         )])
     
     keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="startduel")])
     keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
     
-    selected_count = len(user_selection.get(user_id, []))
+    selected_count = len(selected)
     
     text = (
         f"⚔️ *Выбор героев для дуэли*\n\n"
@@ -77,9 +105,6 @@ async def show_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"⬜ — не выбран, ✅ — выбран\n"
         f"_Нажми на героя, чтобы выбрать/отменить_"
     )
-    
-    # Сохраняем список героев
-    user_selection[f"{user_id}_keys"] = hero_keys
     
     if update.callback_query:
         await update.callback_query.edit_message_text(
@@ -103,36 +128,51 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     data = query.data
     user_id = query.from_user.id
     
-    # hero1, hero2, ... hero20
-    if data.startswith("hero"):
+    if data.startswith("hsel|"):
+        # Выбор героя
         try:
-            hero_num = int(data.replace("hero", "")) - 1
-        except ValueError:
+            hero_idx = int(data.split("|")[1])
+        except (IndexError, ValueError):
             await query.answer("❌ Ошибка!", show_alert=True)
             return
         
-        hero_keys = user_selection.get(f"{user_id}_keys", [])
-        if not hero_keys or hero_num >= len(hero_keys) or hero_num < 0:
-            await query.answer("❌ Ошибка! Попробуй заново.", show_alert=True)
+        collection = get_collection(user_id)
+        hero_keys = list(collection.keys())
+        if hero_idx >= len(hero_keys):
+            await query.answer("❌ Ошибка!", show_alert=True)
             return
         
-        hero_key = hero_keys[hero_num]
+        hero_key = hero_keys[hero_idx]
+        user_data = user_selection.get(user_id, {"selected": [], "page": 0})
+        selected = user_data.get("selected", [])
         
-        if user_id not in user_selection:
-            user_selection[user_id] = []
-        
-        if hero_key in user_selection[user_id]:
-            user_selection[user_id].remove(hero_key)
+        if hero_key in selected:
+            selected.remove(hero_key)
         else:
-            if len(user_selection[user_id]) >= 3:
+            if len(selected) >= 3:
                 await query.answer("❌ Ты уже выбрал 3 героев!", show_alert=True)
                 return
-            user_selection[user_id].append(hero_key)
+            selected.append(hero_key)
         
+        user_selection[user_id]["selected"] = selected
+        await show_hero_selection(update, context, user_id, query.message.chat_id)
+    
+    elif data.startswith("hpage|"):
+        # Смена страницы
+        try:
+            page = int(data.split("|")[1])
+        except (IndexError, ValueError):
+            await query.answer("❌ Ошибка!", show_alert=True)
+            return
+        
+        user_selection[user_id]["page"] = page
         await show_hero_selection(update, context, user_id, query.message.chat_id)
     
     elif data == "startduel":
-        if user_id not in user_selection or len(user_selection[user_id]) != 3:
+        user_data = user_selection.get(user_id, {"selected": [], "page": 0})
+        selected = user_data.get("selected", [])
+        
+        if len(selected) != 3:
             await query.answer("❌ Выбери ровно 3 героев!", show_alert=True)
             return
         
@@ -140,7 +180,6 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     
     elif data == "main_menu":
         user_selection.pop(user_id, None)
-        user_selection.pop(f"{user_id}_keys", None)
         from .start import start
         await start(update, context)
 
@@ -148,7 +187,8 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
 async def start_duel_after_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
     """Запускает дуэль после выбора героев"""
     collection = get_collection(user_id)
-    selected_heroes = user_selection.get(user_id, [])
+    user_data = user_selection.get(user_id, {"selected": [], "page": 0})
+    selected_heroes = user_data.get("selected", [])
     
     if len(selected_heroes) != 3:
         await show_hero_selection(update, context, user_id, update.effective_chat.id)
