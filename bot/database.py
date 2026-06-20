@@ -1,15 +1,14 @@
 import sqlite3
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 
-# База данных теперь в папке data/
+# База данных в папке data/
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
 
 def get_connection():
     """Возвращает соединение с базой данных"""
-    # Создаём папку data/, если её нет
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
@@ -17,6 +16,8 @@ def init_db():
     """Создаёт таблицы, если их нет"""
     conn = get_connection()
     c = conn.cursor()
+    
+    # Таблица пользователей
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -24,9 +25,14 @@ def init_db():
             wins INTEGER DEFAULT 0,
             losses INTEGER DEFAULT 0,
             rating INTEGER DEFAULT 1200,
-            coins INTEGER DEFAULT 500
+            coins INTEGER DEFAULT 500,
+            daily_quiz_streak INTEGER DEFAULT 0,
+            daily_quiz_last_date TEXT,
+            daily_quiz_done INTEGER DEFAULT 0
         )
     ''')
+    
+    # Таблица коллекции героев
     c.execute('''
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,31 +44,67 @@ def init_db():
             UNIQUE(user_id, hero_key)
         )
     ''')
+    
     conn.commit()
     conn.close()
 
 def get_user(user_id: int) -> Dict[str, Any]:
+    """Возвращает данные пользователя"""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT last_free_pack, wins, losses, rating, coins FROM users WHERE user_id = ?", (user_id,))
+    c.execute("""
+        SELECT last_free_pack, wins, losses, rating, coins, 
+               daily_quiz_streak, daily_quiz_last_date, daily_quiz_done 
+        FROM users WHERE user_id = ?
+    """, (user_id,))
     row = c.fetchone()
+    
     if row:
         result = {
             "user_id": user_id,
             "last_free_pack": row[0],
-            "wins": row[1],
-            "losses": row[2],
-            "rating": row[3],
-            "coins": row[4]
+            "wins": row[1] or 0,
+            "losses": row[2] or 0,
+            "rating": row[3] or 1200,
+            "coins": row[4] or 500,
+            "daily_quiz_streak": row[5] or 0,
+            "daily_quiz_last_date": row[6],
+            "daily_quiz_done": row[7] or 0,
         }
     else:
+        # Создаём нового пользователя
         c.execute("INSERT INTO users (user_id, coins) VALUES (?, 500)", (user_id,))
         conn.commit()
-        result = {"user_id": user_id, "last_free_pack": None, "wins": 0, "losses": 0, "rating": 1200, "coins": 500}
+        result = {
+            "user_id": user_id,
+            "last_free_pack": None,
+            "wins": 0,
+            "losses": 0,
+            "rating": 1200,
+            "coins": 500,
+            "daily_quiz_streak": 0,
+            "daily_quiz_last_date": None,
+            "daily_quiz_done": 0,
+        }
+    
     conn.close()
     return result
 
+def update_user(user_id: int, **kwargs) -> None:
+    """Обновляет поля пользователя"""
+    if not kwargs:
+        return
+    
+    conn = get_connection()
+    c = conn.cursor()
+    fields = ", ".join([f"{k} = ?" for k in kwargs.keys()])
+    values = list(kwargs.values()) + [user_id]
+    c.execute(f"UPDATE users SET {fields} WHERE user_id = ?", values)
+    conn.commit()
+    conn.close()
+
 def get_collection(user_id: int) -> Dict[str, Dict]:
+    """Возвращает коллекцию героев пользователя"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT hero_key, hero_data FROM collection WHERE user_id = ?", (user_id,))
@@ -74,6 +116,7 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     return result
 
 def add_hero_to_collection(user_id: int, hero: Dict) -> None:
+    """Добавляет героя в коллекцию"""
     hero_key = f"{hero['author']} – {hero['name']}"
     conn = get_connection()
     c = conn.cursor()
@@ -85,6 +128,7 @@ def add_hero_to_collection(user_id: int, hero: Dict) -> None:
     conn.close()
 
 def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
+    """Обновляет время последнего бесплатного пака"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE users SET last_free_pack = ? WHERE user_id = ?", (timestamp.isoformat(), user_id))
@@ -92,6 +136,7 @@ def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
     conn.close()
 
 def update_duel_stats(user_id: int, win: bool) -> None:
+    """Обновляет статистику дуэлей"""
     conn = get_connection()
     c = conn.cursor()
     if win:
@@ -102,6 +147,7 @@ def update_duel_stats(user_id: int, win: bool) -> None:
     conn.close()
 
 def get_opponent(user_id: int) -> Optional[int]:
+    """Находит случайного соперника для дуэли"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT user_id FROM users WHERE user_id != ? ORDER BY RANDOM() LIMIT 1", (user_id,))
@@ -122,21 +168,29 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     """Возвращает данные пользователя по ID"""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT user_id, last_free_pack, wins, losses, rating, coins FROM users WHERE user_id = ?", (user_id,))
+    c.execute("""
+        SELECT user_id, last_free_pack, wins, losses, rating, coins,
+               daily_quiz_streak, daily_quiz_last_date, daily_quiz_done 
+        FROM users WHERE user_id = ?
+    """, (user_id,))
     row = c.fetchone()
     conn.close()
     if row:
         return {
             "user_id": row[0],
             "last_free_pack": row[1],
-            "wins": row[2],
-            "losses": row[3],
-            "rating": row[4],
-            "coins": row[5]
+            "wins": row[2] or 0,
+            "losses": row[3] or 0,
+            "rating": row[4] or 1200,
+            "coins": row[5] or 500,
+            "daily_quiz_streak": row[6] or 0,
+            "daily_quiz_last_date": row[7],
+            "daily_quiz_done": row[8] or 0,
         }
     return None
 
 def add_coins(user_id: int, amount: int) -> None:
+    """Добавляет монеты пользователю"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE users SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
@@ -144,6 +198,7 @@ def add_coins(user_id: int, amount: int) -> None:
     conn.close()
 
 def spend_coins(user_id: int, amount: int) -> bool:
+    """Списывает монеты, возвращает True если успешно"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT coins FROM users WHERE user_id = ?", (user_id,))
@@ -157,7 +212,7 @@ def spend_coins(user_id: int, amount: int) -> bool:
     return False
 
 def get_leaderboard(limit: int = 10) -> list:
-    """Возвращает список лучших игроков по рейтингу"""
+    """Возвращает топ игроков по рейтингу"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -171,10 +226,10 @@ def get_leaderboard(limit: int = 10) -> list:
     return [
         {
             "user_id": row[0],
-            "wins": row[1],
-            "losses": row[2],
-            "rating": row[3],
-            "coins": row[4]
+            "wins": row[1] or 0,
+            "losses": row[2] or 0,
+            "rating": row[3] or 1200,
+            "coins": row[4] or 500,
         }
         for row in rows
     ]
@@ -188,15 +243,15 @@ def get_user_stats(user_id: int) -> Dict[str, Any]:
     conn.close()
     if row:
         return {
-            "wins": row[0],
-            "losses": row[1],
-            "rating": row[2],
-            "coins": row[3]
+            "wins": row[0] or 0,
+            "losses": row[1] or 0,
+            "rating": row[2] or 1200,
+            "coins": row[3] or 500,
         }
     return {"wins": 0, "losses": 0, "rating": 1200, "coins": 500}
 
 def get_collection_count(user_id: int) -> int:
-    """Возвращает количество героев в коллекции пользователя"""
+    """Возвращает количество героев в коллекции"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM collection WHERE user_id = ?", (user_id,))
@@ -223,8 +278,29 @@ def get_heroes_by_rarity(user_id: int) -> Dict[str, int]:
             pass
     return result
 
+def get_daily_quiz_status(user_id: int) -> Dict[str, Any]:
+    """Возвращает статус ежедневной викторины"""
+    user = get_user(user_id)
+    return {
+        "streak": user.get("daily_quiz_streak", 0),
+        "last_date": user.get("daily_quiz_last_date"),
+        "done": user.get("daily_quiz_done", 0) == 1,
+    }
+
+def reset_daily_quiz(user_id: int) -> None:
+    """Сбрасывает статус викторины (для тестов)"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE users 
+        SET daily_quiz_streak = 0, daily_quiz_last_date = NULL, daily_quiz_done = 0 
+        WHERE user_id = ?
+    """, (user_id,))
+    conn.commit()
+    conn.close()
+
 def reset_user_data(user_id: int) -> None:
-    """Сбрасывает данные пользователя (для отладки)"""
+    """Сбрасывает все данные пользователя (для отладки)"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM collection WHERE user_id = ?", (user_id,))

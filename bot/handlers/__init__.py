@@ -6,11 +6,17 @@ from .duel import (
     answer_callback,
     stop_duel_command,
     handle_hero_selection,
-    cancel_duel,
+    handle_invite_link,
     duel_random,
     duel_friend,
     duel_friend_select,
     duel_bot,
     duel_accept,
+    duel_decline,
+    duel_invite,
+    copy_link,
+    share_link,
+    cancel_duel
 )
 from .admin import add_coins_command
+from .quiz import quiz_command, quiz_answer_callback

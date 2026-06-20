@@ -22,6 +22,7 @@ from .handlers.duel import (
     share_link,
 )
 from .handlers.admin import add_coins_command
+from .handlers.quiz import quiz_command, quiz_answer_callback
 from .web.server import keep_alive
 
 logging.basicConfig(
@@ -42,6 +43,7 @@ def main():
     app.add_handler(CommandHandler("duel", duel_command))
     app.add_handler(CommandHandler("stopduel", stop_duel_command))
     app.add_handler(CommandHandler("addcoins", add_coins_command))
+    app.add_handler(CommandHandler("quiz", quiz_command))
 
     # ========== CALLBACK'И МЕНЮ ==========
     app.add_handler(CallbackQueryHandler(start, pattern="^main_menu$"))
@@ -79,6 +81,9 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^startduel$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
+
+    # ========== ВИКТОРИНА ==========
+    app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
 
     print("🤖 Бот запущен!")
     app.run_polling()
