@@ -1,11 +1,9 @@
-# bot/handlers/pack.py
-
 import random
 import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
-from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins, assign_card_number
+from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
 from ..models.hero import HEROES
 from ..utils.image_generator import create_hero_card
 
@@ -93,13 +91,9 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     weights = PACK_RARITY_WEIGHTS[pack_type]
     hero = get_hero_by_rarity_weights(weights)
     
-    # Добавляем героя в коллекцию
+    # Добавляем героя в коллекцию (номер уже есть в hero)
     add_hero_to_collection(user_id, hero)
-    
-    # Присваиваем номер карты
-    hero_key = f"{hero['author']} – {hero['name']}"
-    card_number = assign_card_number(user_id, hero_key)
-    hero['card_number'] = card_number  # Добавляем номер в объект героя
+    card_number = hero.get('card_number', 0)  # Получаем фиксированный номер
     
     if pack_type == "free":
         update_last_free_pack(user_id, datetime.now())
@@ -116,24 +110,22 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
         f"📖 *{hero['book']}*\n"
         f"✍️ *{hero['author']}*\n"
         f"🆔 № *{card_number:03d}* в альбоме\n\n"
-        f"📊 В коллекции *{total}* героев."
+        f"📊 В альбоме *{total}* героев."
     )
     if pack_type != "free":
         caption += f"\n💰 Осталось: *{user['coins'] - PACK_PRICES[pack_type]}* монет."
 
     keyboard = [
-        [InlineKeyboardButton("📚 Моя коллекция", callback_data="collection")],
+        [InlineKeyboardButton("📚 Альбом", callback_data="album")],
         [InlineKeyboardButton("🎁 Открыть другой пак", callback_data="shop")],
     ]
 
     if query:
-        # Пытаемся удалить старое сообщение, но не падаем, если его нет
         try:
             await query.message.delete()
         except Exception:
-            pass  # Игнорируем ошибку, если сообщение уже удалено
+            pass
         
-        # Отправляем карточку
         await context.bot.send_photo(
             chat_id=chat_id,
             photo=image_bytes,
