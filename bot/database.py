@@ -48,10 +48,46 @@ def init_db():
     conn.commit()
     conn.close()
 
-def get_user(user_id: int) -> Dict[str, Any]:
-    """Возвращает данные пользователя"""
+def migrate_db():
+    """Добавляет недостающие колонки для викторины"""
     conn = get_connection()
     c = conn.cursor()
+    
+    # Проверяем существующие колонки
+    c.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in c.fetchall()]
+    
+    if "daily_quiz_streak" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_streak INTEGER DEFAULT 0")
+        print("✅ Добавлена колонка daily_quiz_streak")
+    
+    if "daily_quiz_last_date" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_last_date TEXT")
+        print("✅ Добавлена колонка daily_quiz_last_date")
+    
+    if "daily_quiz_done" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
+        print("✅ Добавлена колонка daily_quiz_done")
+    
+    conn.commit()
+    conn.close()
+
+def get_user(user_id: int) -> Dict[str, Any]:
+    """Возвращает данные пользователя с автоматической миграцией"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Проверяем и добавляем недостающие колонки
+    c.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in c.fetchall()]
+    
+    if "daily_quiz_streak" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_streak INTEGER DEFAULT 0")
+    if "daily_quiz_last_date" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_last_date TEXT")
+    if "daily_quiz_done" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
+    
     c.execute("""
         SELECT last_free_pack, wins, losses, rating, coins, 
                daily_quiz_streak, daily_quiz_last_date, daily_quiz_done 
@@ -72,7 +108,6 @@ def get_user(user_id: int) -> Dict[str, Any]:
             "daily_quiz_done": row[7] or 0,
         }
     else:
-        # Создаём нового пользователя
         c.execute("INSERT INTO users (user_id, coins) VALUES (?, 500)", (user_id,))
         conn.commit()
         result = {
@@ -87,6 +122,7 @@ def get_user(user_id: int) -> Dict[str, Any]:
             "daily_quiz_done": 0,
         }
     
+    conn.commit()
     conn.close()
     return result
 

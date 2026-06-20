@@ -1,7 +1,7 @@
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from .config import BOT_TOKEN
-from .database import init_db
+from .database import init_db, migrate_db
 from .handlers.start import start, help_command, show_coins, shop
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.collection import show_collection
@@ -32,6 +32,7 @@ logging.basicConfig(
 
 def main():
     init_db()
+    migrate_db()  # <-- Добавить эту строку!
     keep_alive()
 
     app = Application.builder().token(BOT_TOKEN).build()
