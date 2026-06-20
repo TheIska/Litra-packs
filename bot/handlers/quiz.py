@@ -1,4 +1,4 @@
-i# bot/handlers/quiz.py
+# bot/handlers/quiz.py
 
 import random
 import asyncio
@@ -22,7 +22,7 @@ def get_daily_bonus(streak: int) -> int:
 
 
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("🔄 quiz_command вызван!")  # Отладочный вывод
+    print("🔄 quiz_command вызван!")
     query = update.callback_query
     if query:
         try:
