@@ -66,7 +66,8 @@ def get_weighted_questions(selected_heroes, collection, all_questions, count=5):
 
     pool = []
     for q, w in weighted:
-        pool.extend([q] * max(1, int(w)))
+        weight_int = int(w) if w >= 1 else 1
+        pool.extend([q] * min(weight_int, 20))
 
     pool = pool[:1000]
     selected = []
@@ -575,7 +576,15 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_p1 = player_id == duel["player1"]
     player_key = "p1" if is_p1 else "p2"
     opponent_key = "p2" if is_p1 else "p1"
-    player_other = duel[opponent_key]
+    
+    # Исправление: получаем ID соперника
+    if duel.get("is_bot"):
+        # Если дуэль с ботом, соперник - "bot"
+        player_other = "bot" if not is_p1 else None
+    else:
+        # Обычная дуэль: получаем ID из словаря
+        player_other = duel.get("player2") if is_p1 else duel.get("player1")
+    
     is_bot = duel.get("is_bot", False)
 
     if duel.get(f"{player_key}_answered"):
@@ -592,7 +601,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duel["question_active"] = False
         duel["waiting_for_answer"] = False
         await query.edit_message_text("✅ *Правильно!* +1 очко!", parse_mode="Markdown")
-        if not is_bot and player_other != "bot":
+        if not is_bot and player_other and player_other != "bot":
             await context.bot.send_message(player_other, "❌ Соперник ответил правильно! Он получает +1 очко.")
         await send_correct_answer_and_continue(update, context, duel_id)
     else:
@@ -606,7 +615,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             duel["waiting_for_answer"] = False
             duel[f"{player_key}_save_used"] = True
             await query.edit_message_text(f"🔄 *Спасение!*\nОтвет был неправильным, но герои спасли тебя! +1 очко! (шанс {save_chance}%)", parse_mode="Markdown")
-            if not is_bot and player_other != "bot":
+            if not is_bot and player_other and player_other != "bot":
                 await context.bot.send_message(player_other, "🔄 Соперник ошибся, но герои спасли его! Он получает +1 очко.")
             await send_correct_answer_and_continue(update, context, duel_id)
             return
@@ -623,11 +632,11 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif duel.get(f"{opponent_key}_answered"):
             duel["question_active"] = False
             duel["waiting_for_answer"] = False
-            if player_other != "bot":
+            if player_other and player_other != "bot":
                 await context.bot.send_message(player_other, "⏳ Оба ответили неправильно!")
             await send_correct_answer_and_continue(update, context, duel_id)
         else:
-            if player_other != "bot":
+            if player_other and player_other != "bot":
                 await context.bot.send_message(player_other, "🔔 Соперник ответил неправильно! Твой ход!")
 
 
