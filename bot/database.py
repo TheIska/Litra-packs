@@ -3,9 +3,11 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
+from .config import DB_PATH
 
-# База данных в папке data/
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
+# Используем путь из config
+if not DB_PATH:
+    DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
 
 def get_connection():
     """Возвращает соединение с базой данных"""
@@ -32,7 +34,7 @@ def init_db():
         )
     ''')
     
-    # Таблица коллекции героев с полем card_number
+    # Таблица коллекции героев
     c.execute('''
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,11 +84,11 @@ def migrate_db():
     conn.close()
 
 def get_user(user_id: int) -> Dict[str, Any]:
-    """Возвращает данные пользователя с автоматической миграцией"""
+    """Возвращает данные пользователя"""
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем и добавляем недостающие колонки
+    # Проверяем колонки
     c.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -97,7 +99,6 @@ def get_user(user_id: int) -> Dict[str, Any]:
     if "daily_quiz_done" not in columns:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
     
-    # Проверяем collection
     c.execute("PRAGMA table_info(collection)")
     collection_columns = [col[1] for col in c.fetchall()]
     if "card_number" not in collection_columns:
@@ -175,10 +176,22 @@ def add_hero_to_collection(user_id: int, hero: Dict) -> None:
     
     conn = get_connection()
     c = conn.cursor()
-    c.execute(
-        "INSERT OR REPLACE INTO collection (user_id, hero_key, hero_data, card_number) VALUES (?, ?, ?, ?)",
-        (user_id, hero_key, json.dumps(hero, ensure_ascii=False), hero_number)
-    )
+    
+    # Проверяем, есть ли уже такая карта
+    c.execute("SELECT card_number FROM collection WHERE user_id = ? AND hero_key = ?", (user_id, hero_key))
+    existing = c.fetchone()
+    
+    if existing:
+        c.execute(
+            "UPDATE collection SET hero_data = ? WHERE user_id = ? AND hero_key = ?",
+            (json.dumps(hero, ensure_ascii=False), user_id, hero_key)
+        )
+    else:
+        c.execute(
+            "INSERT INTO collection (user_id, hero_key, hero_data, card_number) VALUES (?, ?, ?, ?)",
+            (user_id, hero_key, json.dumps(hero, ensure_ascii=False), hero_number)
+        )
+    
     conn.commit()
     conn.close()
 
@@ -338,7 +351,6 @@ def get_collection_sorted(user_id: int, limit: int = 20, offset: int = 0) -> lis
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем наличие колонки card_number
     c.execute("PRAGMA table_info(collection)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -351,7 +363,6 @@ def get_collection_sorted(user_id: int, limit: int = 20, offset: int = 0) -> lis
             LIMIT ? OFFSET ?
         """, (user_id, limit, offset))
     else:
-        # Если колонки нет - используем id
         c.execute("""
             SELECT hero_key, hero_data, id 
             FROM collection 

@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_collection_sorted, get_collection_count, get_card_by_number
-from ..models.hero import get_total_heroes
+from ..models.hero import get_total_heroes, get_hero_by_number
 from ..utils.image_generator import create_hero_card
 import logging
 
@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 CARDS_PER_PAGE = 8
 
 async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показывает альбом с картами"""
     query = update.callback_query
     await query.answer()
     
@@ -37,7 +36,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     text = f"📚 **Ваш альбом** (стр. {page + 1}/{total_pages})\n"
     text += f"📊 Собрано: {total}/{total_heroes} героев\n\n"
     
-    # Группировка по авторам
     grouped = {}
     for card in cards:
         author = card.get('author', 'Неизвестный')
@@ -67,7 +65,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if nav_buttons:
         keyboard.append(nav_buttons)
     
-    # Быстрые переходы по номерам
     number_buttons = []
     for i in range(1, 10):
         num = i * 25
@@ -86,7 +83,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Навигация по альбому"""
     query = update.callback_query
     await query.answer()
     
@@ -105,7 +101,6 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def find_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Находит и показывает карту по номеру"""
     query = update.callback_query
     await query.answer()
     
@@ -120,7 +115,6 @@ async def find_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_card_number_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обрабатывает ввод номера карты"""
     if not context.user_data.get('waiting_for_card_number'):
         return
     
@@ -145,8 +139,6 @@ async def handle_card_number_input(update: Update, context: ContextTypes.DEFAULT
                 parse_mode="Markdown"
             )
         else:
-            # Показываем информацию о герое, даже если он не в коллекции
-            from ..models.hero import get_hero_by_number
             hero_info = get_hero_by_number(number)
             if hero_info:
                 await update.message.reply_text(

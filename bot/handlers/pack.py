@@ -1,7 +1,6 @@
 import random
-import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, add_hero_to_collection, update_last_free_pack, get_collection, spend_coins
 from ..models.hero import HEROES
@@ -54,11 +53,9 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
         await query.answer()
         user_id = query.from_user.id
         chat_id = query.message.chat_id
-        message_id = query.message.message_id
     else:
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
-        message_id = None
 
     user = get_user(user_id)
 
@@ -90,10 +87,10 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     # Выбор героя
     weights = PACK_RARITY_WEIGHTS[pack_type]
     hero = get_hero_by_rarity_weights(weights)
+    card_number = hero.get('card_number', 0)
     
-    # Добавляем героя в коллекцию (номер уже есть в hero)
+    # Добавляем героя в коллекцию
     add_hero_to_collection(user_id, hero)
-    card_number = hero.get('card_number', 0)  # Получаем фиксированный номер
     
     if pack_type == "free":
         update_last_free_pack(user_id, datetime.now())
@@ -101,7 +98,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     collection = get_collection(user_id)
     total = len(collection)
 
-    # Генерируем карточку с номером
+    # Генерируем карточку
     image_bytes = create_hero_card(hero)
     emoji = RARITY_EMOJIS.get(hero.get("rarity", "обычный"), "📘")
     caption = (
@@ -141,7 +138,6 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-# Обработчики
 async def free_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await open_pack(update, context, "free")
 

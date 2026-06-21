@@ -1,4 +1,3 @@
-# bot/handlers/__init__.py
 from .start import start, help_command, show_coins, shop, report_error, forward_to_admin
 from .pack import free_pack, small_pack, medium_pack, large_pack
 from .album import show_album, album_navigation, find_card_by_number, handle_card_number_input

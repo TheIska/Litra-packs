@@ -1,55 +1,49 @@
-# bot/migrate_cards.py
-import sqlite3
-import os
+# bot/fix_card_numbers.py
 from database import get_connection
+from models.hero import HEROES_BY_NUMBER
 
-def migrate_card_numbers():
-    """Присваивает номера существующим картам в коллекции"""
+def fix_card_numbers():
+    """Исправляет номера карт в базе данных"""
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем наличие колонки card_number
-    c.execute("PRAGMA table_info(collection)")
-    columns = [col[1] for col in c.fetchall()]
+    # Проверяем, есть ли карты без номеров
+    c.execute("SELECT COUNT(*) FROM collection WHERE card_number = 0 OR card_number IS NULL")
+    empty_count = c.fetchone()[0]
     
-    if "card_number" not in columns:
-        print("❌ Колонка card_number не найдена! Запустите migrate_db()")
+    if empty_count == 0:
+        print("✅ Все карты уже имеют номера!")
+        conn.close()
         return
     
-    # Получаем всех пользователей у которых есть карты
+    print(f"🔄 Найдено {empty_count} карт без номеров. Исправляем...")
+    
+    # Получаем всех пользователей
     c.execute("SELECT DISTINCT user_id FROM collection")
     users = c.fetchall()
     
-    if not users:
-        print("📭 Нет карт в базе данных")
-        return
-    
-    migrated = 0
+    fixed = 0
     for user in users:
         user_id = user[0]
-        # Получаем все карты пользователя по дате получения
-        c.execute("""
-            SELECT id FROM collection 
-            WHERE user_id = ? 
-            ORDER BY obtained_at, id
-        """, (user_id,))
+        c.execute("SELECT id, hero_key FROM collection WHERE user_id = ?", (user_id,))
         cards = c.fetchall()
         
-        # Присваиваем номера по порядку
-        for i, card in enumerate(cards, 1):
-            c.execute("""
-                UPDATE collection 
-                SET card_number = ? 
-                WHERE id = ?
-            """, (i, card[0]))
-            migrated += 1
-        
-        print(f"👤 Пользователь {user_id}: {len(cards)} карт")
+        for card_id, hero_key in cards:
+            # Находим героя по ключу
+            found = False
+            for number, hero in HEROES_BY_NUMBER.items():
+                if f"{hero['author']} – {hero['name']}" == hero_key:
+                    c.execute("UPDATE collection SET card_number = ? WHERE id = ?", (number, card_id))
+                    fixed += 1
+                    found = True
+                    break
+            
+            if not found:
+                print(f"⚠️ Не найден герой для: {hero_key}")
     
     conn.commit()
     conn.close()
-    print(f"\n✅ Готово! Присвоены номера для {len(users)} пользователей, {migrated} карт")
+    print(f"✅ Исправлено {fixed} карт!")
 
 if __name__ == "__main__":
-    print("🔄 Запуск миграции номеров карт...")
-    migrate_card_numbers()
+    fix_card_numbers()
