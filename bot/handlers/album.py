@@ -12,7 +12,11 @@ CARDS_PER_PAGE = 8
 async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает альбом со всеми героями"""
     query = update.callback_query
-    await query.answer()
+    if query:
+        try:
+            await query.answer()
+        except:
+            pass
     
     user_id = update.effective_user.id
     page = context.user_data.get('album_page', 0)
@@ -46,10 +50,8 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             number, hero = sorted_heroes[i]
             is_collected = number in collected_numbers
             
-            # Эмодзи статуса
             status = "✅" if is_collected else "❌"
             
-            # Эмодзи редкости
             rarity_emoji = {
                 "легендарный": "👑",
                 "эпический": "💜",
@@ -57,12 +59,10 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "обычный": "📜"
             }.get(hero.get('rarity', 'обычный'), "📜")
             
-            # Имя героя (обрезаем если длинное)
             name = hero.get('name', 'Неизвестный')
             if len(name) > 20:
                 name = name[:18] + ".."
             
-            # Кнопка для каждой карты
             button_text = f"{status} {number:03d}. {rarity_emoji} {name}"
             callback_data = f"album_card_{number}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
@@ -86,17 +86,30 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     
     keyboard.append([InlineKeyboardButton("🏠 В меню", callback_data="main_menu")])
     
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    try:
+        if query and query.message:
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        logger.error(f"Ошибка при показе альбома: {e}")
 
 
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Навигация по альбому"""
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except:
+        pass
     
     action = query.data
     
@@ -115,18 +128,19 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает карту по номеру (по нажатию на кнопку)"""
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except:
+        pass
     
     user_id = update.effective_user.id
     
-    # Получаем номер карты из callback_data
     try:
         number = int(query.data.split("_")[2])
     except:
         await query.edit_message_text("❌ Ошибка! Попробуйте снова.")
         return
     
-    # Проверяем, есть ли карта в коллекции
     card = get_card_by_number(user_id, number)
     hero_info = get_hero_by_number(number)
     
@@ -135,22 +149,23 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     
     if card:
-        # Карта есть - показываем
-        image_bytes = create_hero_card(card)
-        
-        # Отправляем карточку новым сообщением
-        await query.message.reply_photo(
-            photo=image_bytes,
-            caption=f"✅ **{hero_info['name']}**\n"
-                   f"🆔 № {number:03d}\n"
-                   f"✍️ {hero_info['author']}\n"
-                   f"📚 {hero_info['book']}\n"
-                   f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
-                   "🎉 Эта карта есть в вашем альбоме!",
-            parse_mode="Markdown"
-        )
+        try:
+            image_bytes = create_hero_card(card)
+            
+            await query.message.reply_photo(
+                photo=image_bytes,
+                caption=f"✅ **{hero_info['name']}**\n"
+                       f"🆔 № {number:03d}\n"
+                       f"✍️ {hero_info['author']}\n"
+                       f"📚 {hero_info['book']}\n"
+                       f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
+                       "🎉 Эта карта есть в вашем альбоме!",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при показе карты: {e}")
+            await query.edit_message_text("❌ Ошибка при создании карточки")
     else:
-        # Карты нет - показываем информацию
         rarity_emoji = {
             "легендарный": "👑",
             "эпический": "💜",
@@ -158,7 +173,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             "обычный": "📜"
         }.get(hero_info.get('rarity', 'обычный'), "📜")
         
-        # Создаём кнопку для возврата
         keyboard = [[InlineKeyboardButton("🔙 Назад в альбом", callback_data="album_back")]]
         
         await query.message.reply_text(
@@ -177,5 +191,9 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def album_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Возврат в альбом"""
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except:
+        pass
+    
     await show_album(update, context)

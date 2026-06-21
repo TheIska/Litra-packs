@@ -105,9 +105,6 @@ def main():
     # ========== ВИКТОРИНА ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
 
-    # ========== ВВОД НОМЕРА КАРТЫ ==========
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_card_number_input))
-
     # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
 
