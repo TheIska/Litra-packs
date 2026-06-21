@@ -3,11 +3,9 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
-from .config import DB_PATH
 
-# Используем путь из config
-if not DB_PATH:
-    DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
+# Определяем путь к базе данных
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
 
 def get_connection():
     """Возвращает соединение с базой данных"""
