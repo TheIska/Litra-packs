@@ -14,8 +14,8 @@ from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.album import (
     show_album, 
     album_navigation, 
-    find_card_by_number,
-    handle_card_number_input
+    show_card_by_number,
+    album_back
 )
 from .handlers.duel import (
     duel_command,
@@ -76,7 +76,8 @@ def main():
     # ========== АЛЬБОМ ==========
     app.add_handler(CallbackQueryHandler(show_album, pattern="^album$"))
     app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
-    app.add_handler(CallbackQueryHandler(find_card_by_number, pattern="^album_find$"))
+    app.add_handler(CallbackQueryHandler(show_card_by_number, pattern="^album_card_"))
+    app.add_handler(CallbackQueryHandler(album_back, pattern="^album_back$"))
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
