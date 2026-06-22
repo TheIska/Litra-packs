@@ -8,6 +8,7 @@ import traceback
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 def load_font(size, style="regular"):
+    """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
@@ -26,6 +27,7 @@ def load_font(size, style="regular"):
 
 
 def load_portrait(hero):
+    """Загружает портрет для легендарного героя"""
     try:
         if hero.get("rarity") != "легендарный":
             return None
@@ -100,6 +102,7 @@ def get_random_quote(author):
 
 
 def create_vintage_texture(width, height):
+    """Создаёт текстуру старой бумаги"""
     try:
         img = Image.new('RGB', (width, height), (245, 240, 230))
         draw = ImageDraw.Draw(img)
@@ -126,6 +129,7 @@ def create_vintage_texture(width, height):
 
 
 def draw_stars(draw, x, y, count, color):
+    """Рисует звёздочки для редкости"""
     try:
         for i in range(count):
             star_x = x - (count - 1) * 14 + i * 28
@@ -140,6 +144,7 @@ def draw_stars(draw, x, y, count, color):
 
 
 def create_hero_card(hero):
+    """Создаёт карточку героя с номером"""
     try:
         print(f"🖼️ create_hero_card вызвана для: {hero.get('name', 'Unknown')}")
         
@@ -185,18 +190,22 @@ def create_hero_card(hero):
         img = create_vintage_texture(width, height)
         draw = ImageDraw.Draw(img)
 
+        # Рамка
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
+        # Номер карты
         font_number = load_font(18, "bold")
         number_text = f"№ {card_number:03d}"
         draw.text((width - 30, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
+        # Заголовок
         y = 30
         font_title = load_font(20, "italic")
         draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
         y += 20
 
+        # Портрет
         portrait_y = y + 5
         portrait_size = 210
         
@@ -222,6 +231,7 @@ def create_hero_card(hero):
         else:
             y = portrait_y + 170
 
+        # Имя героя
         name = hero.get("name", "Неизвестный герой")
         font_name = load_font(44, "bold")
         
@@ -229,6 +239,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
         y += 48
 
+        # Информация
         font_info = load_font(20, "regular")
         font_small = load_font(17, "italic")
         font_quote = load_font(17, "italic")
@@ -271,6 +282,7 @@ def create_hero_card(hero):
             draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
             y += 35
 
+        # Редкость
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
             "эпический": "ЭПИЧЕСКИЙ",
@@ -298,6 +310,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
         y += 40
 
+        # Футер
         footer_y = height - 25
         font_footer = load_font(14, "italic")
         draw.text((width//2, footer_y), "Из собрания литературных героев", 
@@ -314,12 +327,13 @@ def create_hero_card(hero):
         img.save(bio, format='JPEG', quality=95, optimize=True)
         bio.seek(0)
         
-        print(f"✅ Карточка создана")
+        print(f"✅ Карточка создана для {hero.get('name')}")
         return bio
         
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в create_hero_card: {e}")
         traceback.print_exc()
+        # Создаём заглушку
         img = Image.new('RGB', (500, 700), (255, 200, 200))
         draw = ImageDraw.Draw(img)
         draw.text((250, 350), "Ошибка создания карточки", fill=(0, 0, 0), anchor="mt")

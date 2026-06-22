@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 CARDS_PER_PAGE = 8
 
 async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает альбом со всеми героями"""
     try:
         print("🔵 show_album вызван")
         
@@ -107,12 +108,14 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Навигация по альбому"""
     try:
         query = update.callback_query
         action = query.data
         
         print(f"🟣 album_navigation вызван, действие: {action}")
         
+        # ЕСЛИ ЭТО КАРТОЧКА - ПРОПУСКАЕМ!
         if action.startswith("album_card_"):
             print("🟣 Это карточка! Пропускаем для show_card_by_number")
             return
@@ -121,13 +124,17 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         if action == "album_prev":
             context.user_data['album_page'] = context.user_data.get('album_page', 0) - 1
+            print(f"🟣 Страница: {context.user_data['album_page']}")
         elif action == "album_next":
             context.user_data['album_page'] = context.user_data.get('album_page', 0) + 1
+            print(f"🟣 Страница: {context.user_data['album_page']}")
         elif action.startswith("album_goto_"):
             number = int(action.split("_")[2])
             page = (number - 1) // CARDS_PER_PAGE
             context.user_data['album_page'] = page
+            print(f"🟣 Переход к {number}, страница {page}")
         else:
+            print(f"🟣 Неизвестное действие: {action}")
             return
         
         await show_album(update, context)
@@ -138,12 +145,14 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает карту по номеру (по нажатию на кнопку)"""
     try:
         print("🔴🔴🔴🔴🔴 show_card_by_number ВЫЗВАНА! 🔴🔴🔴🔴🔴")
         
         query = update.callback_query
         print(f"🔴 query.data: {query.data}")
         
+        # ОТВЕЧАЕМ НА CALLBACK СРАЗУ!
         try:
             await query.answer()
             print("✅ Ответили на callback")
@@ -156,10 +165,14 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         number = int(query.data.split("_")[2])
         print(f"🔍 Номер карты: {number}")
         
+        # Получаем карту из БД для проверки наличия
         card = get_card_by_number(user_id, number)
+        
+        # Получаем информацию о герое из словаря (для правильных данных)
         hero_info = get_hero_by_number(number)
         
-        print(f"📊 Карта найдена: {card is not None}")
+        print(f"📊 card из БД: {card is not None}")
+        print(f"📊 hero_info: {hero_info.get('name') if hero_info else None}")
         
         if not hero_info:
             await context.bot.send_message(
@@ -171,9 +184,9 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         if card:
             try:
                 print(f"🎴 Генерируем карточку для {hero_info['name']}")
-                image_bytes = create_hero_card(card)
+                # Используем hero_info для генерации карточки (правильные данные)
+                image_bytes = create_hero_card(hero_info)
                 
-                # ПРОВЕРКА: если это BytesIO - получаем байты
                 if hasattr(image_bytes, 'getvalue'):
                     image_data = image_bytes.getvalue()
                     print(f"✅ Карточка создана, размер: {len(image_data)} байт")
@@ -237,6 +250,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def album_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Возврат в альбом"""
     try:
         print("🟢 album_back вызван")
         query = update.callback_query
