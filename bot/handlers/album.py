@@ -63,7 +63,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 
                 button_text = f"{status} {number:03d}. {rarity_emoji} {name}"
                 callback_data = f"album_card_{number}"
-                print(f"🟢 Создана кнопка: {button_text} -> {callback_data}")
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
         nav_buttons = []
@@ -95,11 +94,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 print("✅ Альбом обновлён")
             except Exception as e:
                 print(f"❌ Ошибка при редактировании: {e}")
-                await query.message.reply_text(
-                    text,
-                    reply_markup=reply_markup,
-                    parse_mode="Markdown"
-                )
         else:
             await update.message.reply_text(
                 text,
@@ -116,17 +110,17 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Навигация по альбому"""
     try:
-        print("🟣 album_navigation вызван")
         query = update.callback_query
-        await query.answer()
-        
         action = query.data
-        print(f"🟣 Действие: {action}")
         
-        # ПРОВЕРКА: если это карточка - пропускаем
+        print(f"🟣 album_navigation вызван, действие: {action}")
+        
+        # ЕСЛИ ЭТО КАРТОЧКА - ПРОПУСКАЕМ!
         if action.startswith("album_card_"):
-            print("🟣 Это карточка, пропускаем (обработает show_card_by_number)")
+            print("🟣 Это карточка! Пропускаем для show_card_by_number")
             return
+        
+        await query.answer()
         
         if action == "album_prev":
             context.user_data['album_page'] = context.user_data.get('album_page', 0) - 1
@@ -153,7 +147,7 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает карту по номеру (по нажатию на кнопку)"""
     try:
-        print("🔴🔴🔴 show_card_by_number ВЫЗВАНА! 🔴🔴🔴")
+        print("🔴🔴🔴🔴🔴 show_card_by_number ВЫЗВАНА! 🔴🔴🔴🔴🔴")
         
         query = update.callback_query
         print(f"🔴 query.data: {query.data}")
@@ -218,6 +212,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
+            print(f"✅ Сообщение об отсутствии карты отправлено")
             
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в show_card_by_number: {e}")
