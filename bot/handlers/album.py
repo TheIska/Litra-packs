@@ -165,6 +165,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         hero_info = get_hero_by_number(number)
         
         print(f"📊 Карта найдена: {card is not None}")
+        print(f"📊 Герой: {hero_info}")
         
         if not hero_info:
             await context.bot.send_message(
@@ -174,22 +175,30 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         
         if card:
-            print(f"🎴 Генерируем карточку для {hero_info['name']}")
-            image_bytes = create_hero_card(card)
-            print(f"✅ Карточка создана, размер: {len(image_bytes)} байт")
-            
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=image_bytes,
-                caption=f"✅ **{hero_info['name']}**\n"
-                       f"🆔 № {number:03d}\n"
-                       f"✍️ {hero_info['author']}\n"
-                       f"📚 {hero_info['book']}\n"
-                       f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
-                       "🎉 Эта карта есть в вашем альбоме!",
-                parse_mode="Markdown"
-            )
-            print(f"✅ Карточка отправлена в чат {chat_id}!")
+            try:
+                print(f"🎴 Генерируем карточку для {hero_info['name']}")
+                image_bytes = create_hero_card(card)
+                print(f"✅ Карточка создана, размер: {len(image_bytes)} байт")
+                
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=image_bytes,
+                    caption=f"✅ **{hero_info['name']}**\n"
+                           f"🆔 № {number:03d}\n"
+                           f"✍️ {hero_info['author']}\n"
+                           f"📚 {hero_info['book']}\n"
+                           f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
+                           "🎉 Эта карта есть в вашем альбоме!",
+                    parse_mode="Markdown"
+                )
+                print(f"✅ Карточка отправлена в чат {chat_id}!")
+            except Exception as e:
+                print(f"❌ Ошибка при отправке карточки: {e}")
+                traceback.print_exc()
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"❌ Ошибка при создании карточки для {hero_info['name']}"
+                )
         else:
             rarity_emoji = {
                 "легендарный": "👑",
@@ -217,6 +226,13 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в show_card_by_number: {e}")
         traceback.print_exc()
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ Произошла ошибка. Попробуйте позже."
+            )
+        except:
+            pass
 
 
 async def album_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
