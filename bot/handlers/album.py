@@ -11,12 +11,14 @@ CARDS_PER_PAGE = 8
 
 async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает альбом со всеми героями"""
+    print("🔵 show_album вызван")
+    
     query = update.callback_query
     if query:
         try:
             await query.answer()
         except Exception as e:
-            print(f"Ошибка answer: {e}")
+            print(f"Ошибка answer в show_album: {e}")
     
     user_id = update.effective_user.id
     page = context.user_data.get('album_page', 0)
@@ -24,14 +26,12 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     total_heroes = get_total_heroes()
     total_pages = (total_heroes - 1) // CARDS_PER_PAGE + 1
     
-    # Получаем коллекцию пользователя
     collection = get_collection(user_id)
     collected_numbers = set()
     for hero in collection.values():
         if hero.get('card_number', 0) > 0:
             collected_numbers.add(hero.get('card_number', 0))
     
-    # Получаем всех героев для текущей страницы
     start_idx = page * CARDS_PER_PAGE
     end_idx = min(start_idx + CARDS_PER_PAGE, total_heroes)
     sorted_heroes = sorted(HEROES_BY_NUMBER.items())
@@ -61,9 +61,9 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             
             button_text = f"{status} {number:03d}. {rarity_emoji} {name}"
             callback_data = f"album_card_{number}"
+            print(f"🟢 Создана кнопка: {button_text} -> {callback_data}")
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
     
-    # Кнопки навигации
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("◀️ Назад", callback_data="album_prev"))
@@ -72,7 +72,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if nav_buttons:
         keyboard.append(nav_buttons)
     
-    # Быстрые переходы по номерам
     number_buttons = []
     for i in range(1, 10):
         num = i * 25
@@ -95,13 +94,15 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
+        print("✅ Альбом показан")
     except Exception as e:
-        print(f"Ошибка при показе альбома: {e}")
+        print(f"❌ Ошибка при показе альбома: {e}")
         logger.error(f"Ошибка при показе альбома: {e}")
 
 
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Навигация по альбому"""
+    print("🟣 album_navigation вызван")
     query = update.callback_query
     try:
         await query.answer()
@@ -109,32 +110,45 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         print(f"Ошибка answer в навигации: {e}")
     
     action = query.data
+    print(f"🟣 Действие: {action}")
     
     if action == "album_prev":
         context.user_data['album_page'] = context.user_data.get('album_page', 0) - 1
+        print(f"🟣 Страница: {context.user_data['album_page']}")
     elif action == "album_next":
         context.user_data['album_page'] = context.user_data.get('album_page', 0) + 1
+        print(f"🟣 Страница: {context.user_data['album_page']}")
     elif action.startswith("album_goto_"):
         number = int(action.split("_")[2])
         page = (number - 1) // CARDS_PER_PAGE
         context.user_data['album_page'] = page
+        print(f"🟣 Переход к {number}, страница {page}")
     
     await show_album(update, context)
 
 
 async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает карту по номеру (по нажатию на кнопку)"""
+    print("🔴🔴🔴 show_card_by_number ВЫЗВАНА! 🔴🔴🔴")
+    
     query = update.callback_query
+    print(f"🔴 query.data: {query.data}")
+    print(f"🔴 query.message: {query.message}")
+    print(f"🔴 query.from_user: {query.from_user}")
     
     # ОБЯЗАТЕЛЬНО отвечаем на callback
     try:
         await query.answer()
-        print(f"✅ Ответили на callback")
+        print("✅ Ответили на callback")
     except Exception as e:
         print(f"❌ Ошибка при answer: {e}")
     
     user_id = update.effective_user.id
-    chat_id = query.message.chat_id
+    chat_id = query.message.chat_id if query.message else None
+    
+    if not chat_id:
+        print("❌ Нет chat_id!")
+        return
     
     # Получаем номер карты
     try:
@@ -142,14 +156,18 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         print(f"🔍 Номер карты: {number}")
     except Exception as e:
         print(f"❌ Ошибка при получении номера: {e}")
-        await query.edit_message_text("❌ Ошибка! Попробуйте снова.")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Ошибка! Попробуйте снова."
+        )
         return
     
     # Проверяем, есть ли карта
     card = get_card_by_number(user_id, number)
     hero_info = get_hero_by_number(number)
     
-    print(f"📊 Карта: {card}, Герой: {hero_info}")
+    print(f"📊 Карта: {card}")
+    print(f"📊 Герой: {hero_info}")
     
     if not hero_info:
         await context.bot.send_message(
@@ -207,11 +225,11 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def album_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Возврат в альбом"""
+    print("🟢 album_back вызван")
     query = update.callback_query
     try:
         await query.answer()
     except Exception as e:
         print(f"Ошибка answer в album_back: {e}")
     
-    # Восстанавливаем страницу альбома
     await show_album(update, context)
