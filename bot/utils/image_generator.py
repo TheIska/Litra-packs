@@ -190,7 +190,7 @@ def create_hero_card(hero):
         img = create_vintage_texture(width, height)
         draw = ImageDraw.Draw(img)
 
-        # Рамка
+        # Рамка карты (только одна внешняя)
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
@@ -199,7 +199,7 @@ def create_hero_card(hero):
         number_text = f"№ {card_number:03d}"
         draw.text((width - 30, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # Заголовок Litra Packs
+        # Заголовок Litra Packs - БЕЗ РАМКИ
         y = 30
         font_title = load_font(20, "italic")
         draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
@@ -207,15 +207,14 @@ def create_hero_card(hero):
         # Опускаем всё ниже
         y = 80
 
-        # --- ЛЕГЕНДАРНЫЙ: увеличенный портрет и кружок ---
+        # --- ЛЕГЕНДАРНЫЙ: портрет с рамкой вокруг ---
         if is_legendary:
-            portrait_size = 180  # УВЕЛИЧЕННЫЙ портрет (было 150)
-            circle_size = 200    # Увеличенный кружок (было 180)
+            portrait_size = 170  # Размер портрета
             portrait_y = y + 5
             
             portrait = load_portrait(hero)
             if portrait:
-                # Масштабируем портрет до увеличенного размера
+                # Масштабируем портрет
                 portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
                 
                 # Создаём маску для круга
@@ -228,28 +227,20 @@ def create_hero_card(hero):
                 x = (width - portrait_size) // 2
                 img.paste(portrait, (x, portrait_y), portrait)
                 
-                # Увеличенная рамка (кружок) вокруг портрета
-                circle_x = (width - circle_size) // 2
-                circle_y = portrait_y - (circle_size - portrait_size) // 2
+                # РАМКА ВОКРУГ ПОРТРЕТА (плотно облегает)
+                margin = 4
+                draw.ellipse([(x - margin, portrait_y - margin), 
+                              (x + portrait_size + margin, portrait_y + portrait_size + margin)], 
+                             outline=pal["border"], width=2)
                 
-                # Внешняя рамка (большой кружок)
-                draw.ellipse([(circle_x, circle_y), (circle_x + circle_size, circle_y + circle_size)], 
-                             outline=pal["border"], width=3)
-                
-                # Внутренняя рамка
-                draw.ellipse([(circle_x + 4, circle_y + 4), (circle_x + circle_size - 4, circle_y + circle_size - 4)], 
+                # Тонкая внутренняя рамка
+                draw.ellipse([(x + 2, portrait_y + 2), 
+                              (x + portrait_size - 2, portrait_y + portrait_size - 2)], 
                              outline=pal["accent"], width=1)
                 
-                # Декоративные точки вокруг кружка
-                for angle in range(0, 360, 30):
-                    rad = math.radians(angle)
-                    dot_x = circle_x + circle_size//2 + int((circle_size//2 + 5) * math.cos(rad))
-                    dot_y = circle_y + circle_size//2 + int((circle_size//2 + 5) * math.sin(rad))
-                    draw.ellipse([(dot_x - 2, dot_y - 2), (dot_x + 2, dot_y + 2)], fill=pal["accent"])
-                
-                y = circle_y + circle_size + 25
+                y = portrait_y + portrait_size + 30
             else:
-                y = portrait_y + 220
+                y = portrait_y + 200
         else:
             y += 20
 
