@@ -202,15 +202,15 @@ def create_hero_card(hero):
         # Заголовок Litra Packs
         y = 30
         font_title = load_font(20, "italic")
-        draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
+        draw.text((width//2, y), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
         
         # Опускаем всё ниже
-        y = 80
+        y = 75
 
         # --- ЛЕГЕНДАРНЫЙ: портрет ---
         if is_legendary:
             portrait_size = 170
-            portrait_y = y + 5
+            portrait_y = y
             
             portrait = load_portrait(hero)
             if portrait:
@@ -237,46 +237,36 @@ def create_hero_card(hero):
             else:
                 y = portrait_y + 200
         else:
-            # --- НЕЛЕГЕНДАРНЫЙ: ТЕКСТ В ЦЕНТРЕ ---
-            # Книга и автор в центре (большой текст)
+            # --- НЕЛЕГЕНДАРНЫЙ: книга и автор в центре ---
             book = hero.get("book", hero.get("work", "Неизвестное произведение"))
             author = hero.get("author", "Неизвестный автор")
             
-            # Ограничиваем длину
             if len(book) > 25:
                 book = book[:22] + "..."
             
             # Крупный текст книги
             font_book_center = load_font(32, "bold")
-            draw.text((width//2, y + 60), f'«{book}»', fill=pal["text"], font=font_book_center, anchor="mt")
+            draw.text((width//2, y + 60), f'"{book}"', fill=pal["text"], font=font_book_center, anchor="mt")
             
             # Автор поменьше
-            font_author_center = load_font(24, "italic")
-            draw.text((width//2, y + 130), f'— {author} —', fill=pal["sub"], font=font_author_center, anchor="mt")
+            font_author_center = load_font(22, "italic")
+            draw.text((width//2, y + 120), author, fill=pal["sub"], font=font_author_center, anchor="mt")
             
             # Декоративная линия под текстом
-            line_y = y + 170
-            draw.line([(100, line_y), (width - 100, line_y)], fill=pal["border"], width=1)
+            line_y = y + 160
+            draw.line([(80, line_y), (width - 80, line_y)], fill=pal["border"], width=1)
             
-            # Маленькие точки по краям линии
-            draw.ellipse([(95, line_y - 3), (101, line_y + 3)], fill=pal["accent"])
-            draw.ellipse([(width - 101, line_y - 3), (width - 95, line_y + 3)], fill=pal["accent"])
-            
-            # Символ книги
-            font_symbol = load_font(50, "regular")
-            draw.text((width//2, y + 190), "📖", fill=pal["accent"], font=font_symbol, anchor="mt")
-            
-            y = y + 260
+            y = line_y + 50
 
-        # Имя героя
+        # Имя героя (как было раньше - сразу после портрета/книги)
         name = hero.get("name", "Неизвестный герой")
-        font_name = load_font(40, "bold")
+        font_name = load_font(38, "bold")
         
         draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
         y += 40
 
-        # Информация (для легендарных - дополнительная, для нелегендарных - уже показана)
+        # Информация
         font_info = load_font(18, "regular")
         font_small = load_font(15, "italic")
         font_quote = load_font(16, "italic")
@@ -302,15 +292,14 @@ def create_hero_card(hero):
                 lines.append(current)
             
             for line in lines[:3]:
-                draw.text((width//2, y), f'«{line}»', fill=pal["sub"], font=font_quote, anchor="mt")
+                draw.text((width//2, y), f'"{line}"', fill=pal["sub"], font=font_quote, anchor="mt")
                 y += 22
             
             y += 5
             draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
             y += 35
         else:
-            # Для нелегендарных уже показали книгу и автора в центре
-            # Просто добавляем отступ
+            # Для нелегендарных - короткая информация
             y += 10
 
         # Редкость
@@ -364,7 +353,6 @@ def create_hero_card(hero):
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в create_hero_card: {e}")
         traceback.print_exc()
-        # Создаём заглушку
         img = Image.new('RGB', (500, 700), (255, 200, 200))
         draw = ImageDraw.Draw(img)
         draw.text((250, 350), "Ошибка создания карточки", fill=(0, 0, 0), anchor="mt")
