@@ -203,52 +203,61 @@ def create_hero_card(hero):
         y = 30
         font_title = load_font(20, "italic")
         draw.text((width//2, y), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
-        y += 20
+        y += 15
 
-        # Портрет
-        portrait_y = y + 5
-        portrait_size = 210
-        
+        # --- ЛЕГЕНДАРНЫЙ: портрет меньше и смещён вниз ---
         if is_legendary:
+            portrait_size = 150  # Уменьшенный портрет
+            portrait_y = y + 10  # Отступ сверху
+            
             portrait = load_portrait(hero)
             if portrait:
+                # Масштабируем портрет
                 portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
                 
+                # Создаём маску для круга
                 mask = Image.new('L', (portrait_size, portrait_size), 0)
                 mask_draw = ImageDraw.Draw(mask)
                 mask_draw.ellipse((2, 2, portrait_size - 2, portrait_size - 2), fill=255)
                 portrait.putalpha(mask)
                 
+                # Центрируем портрет
                 x = (width - portrait_size) // 2
                 img.paste(portrait, (x, portrait_y), portrait)
                 
+                # Рамка вокруг портрета
                 draw.ellipse([(x - 4, portrait_y - 4), (x + portrait_size + 4, portrait_y + portrait_size + 4)], 
                              outline=pal["border"], width=2)
                 
-                y = portrait_y + portrait_size + 25
+                # Тонкая внутренняя рамка
+                draw.ellipse([(x - 2, portrait_y - 2), (x + portrait_size + 2, portrait_y + portrait_size + 2)], 
+                             outline=pal["accent"], width=1)
+                
+                y = portrait_y + portrait_size + 20  # Отступ после портрета
             else:
-                y = portrait_y + 230
+                y = portrait_y + 160
         else:
-            y = portrait_y + 170
+            # Для нелегендарных - просто отступ
+            y += 20
 
         # Имя героя
         name = hero.get("name", "Неизвестный герой")
-        font_name = load_font(44, "bold")
+        font_name = load_font(40, "bold")
         
         draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
-        y += 48
+        y += 40
 
         # Информация
-        font_info = load_font(20, "regular")
-        font_small = load_font(17, "italic")
-        font_quote = load_font(17, "italic")
+        font_info = load_font(18, "regular")
+        font_small = load_font(15, "italic")
+        font_quote = load_font(16, "italic")
         
         if is_legendary and portrait:
             author = hero.get("author", "")
             years = get_years(author)
             draw.text((width//2, y), years, fill=pal["sub"], font=font_small, anchor="mt")
-            y += 28
+            y += 22
             
             quote = get_random_quote(author)
             words = quote.split()
@@ -266,21 +275,21 @@ def create_hero_card(hero):
             
             for line in lines[:3]:
                 draw.text((width//2, y), f'«{line}»', fill=pal["sub"], font=font_quote, anchor="mt")
-                y += 26
+                y += 22
             
-            y += 10
+            y += 5
             draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
-            y += 40
+            y += 35
         else:
             book = hero.get("book", hero.get("work", "Неизвестное произведение"))
             if len(book) > 30:
                 book = book[:27] + "..."
             draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_info, anchor="mt")
-            y += 30
+            y += 26
             
             author = hero.get("author", "Неизвестный автор")
             draw.text((width//2, y), f"— {author} —", fill=pal["sub"], font=font_small, anchor="mt")
-            y += 35
+            y += 30
 
         # Редкость
         labels = {
@@ -290,7 +299,7 @@ def create_hero_card(hero):
             "обычный": "ОБЫЧНЫЙ"
         }
         rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-        font_rare = load_font(22, "bold")
+        font_rare = load_font(20, "bold")
         
         colors_rare = {
             "легендарный": (200, 160, 80),
@@ -303,16 +312,16 @@ def create_hero_card(hero):
         stars_count = {"легендарный": 5, "эпический": 4, "редкий": 3, "обычный": 2}
         stars = stars_count.get(rarity, 2)
         
-        star_y = y - 5
+        star_y = y - 3
         draw_stars(draw, width//2, star_y, stars, color)
         
         draw.text((width//2 + 1, y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
         draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
-        y += 40
+        y += 35
 
         # Футер
         footer_y = height - 25
-        font_footer = load_font(14, "italic")
+        font_footer = load_font(13, "italic")
         draw.text((width//2, footer_y), "Из собрания литературных героев", 
                  fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 160), 
                  font=font_footer, anchor="mt")
