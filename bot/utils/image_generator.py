@@ -143,23 +143,6 @@ def draw_stars(draw, x, y, count, color):
         print(f"❌ Ошибка в draw_stars: {e}")
 
 
-def draw_vintage_ornament(draw, x, y, pal):
-    """Рисует маленький винтажный орнамент"""
-    for angle in range(0, 360, 60):
-        rad = math.radians(angle)
-        dx = int(8 * math.cos(rad))
-        dy = int(8 * math.sin(rad))
-        draw.point((x + dx, y + dy), fill=pal["border"])
-    
-    draw.ellipse([(x - 2, y - 2), (x + 2, y + 2)], fill=pal["accent"])
-    
-    for angle in range(30, 360, 60):
-        rad = math.radians(angle)
-        dx = int(13 * math.cos(rad))
-        dy = int(13 * math.sin(rad))
-        draw.point((x + dx, y + dy), fill=pal["border_light"])
-
-
 def create_hero_card(hero):
     """Создаёт карточку героя с номером"""
     try:
@@ -221,56 +204,20 @@ def create_hero_card(hero):
         number_text = f"№ {card_number:03d}"
         draw.text((width - 30, 25), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- РАСЧЁТ ЦЕНТРА ---
-        # Вычисляем общую высоту всех блоков
-        blocks = []
-        
-        # Заголовок
-        blocks.append(("title", 30))
-        
-        # Портрет (если есть)
-        if is_legendary:
-            blocks.append(("portrait", 160))
-            blocks.append(("spacer", 20))
-        
-        # Имя
-        blocks.append(("name", 50))
-        
-        # Книга
-        blocks.append(("book", 30))
-        
-        # Автор
-        blocks.append(("author", 30))
-        
-        # Орнамент
-        blocks.append(("ornament", 30))
-        
-        # Редкость
-        blocks.append(("rarity", 35))
-        
-        # Футер
-        blocks.append(("footer", 25))
-        
-        # Вычисляем общую высоту
-        total_height = sum([b[1] for b in blocks])
-        
-        # Находим стартовую позицию для центрирования
-        start_y = (height - total_height) // 2
-        
-        current_y = start_y
-
-        # --- ЗАГОЛОВОК ---
-        y = current_y
+        # --- ЗАГОЛОВОК НАВЕРХУ ---
+        y = 35
         font_title = load_font(22, "italic")
         draw.text((width//2, y), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
-        current_y += 30
         
         # Линия под заголовком
-        line_y = current_y - 5
+        line_y = y + 20
         draw.line([(150, line_y), (width - 150, line_y)], fill=pal["border_light"], width=1)
-        current_y += 5
+        
+        # Стартовая позиция для основного контента
+        start_y = 85
 
         # --- ПОРТРЕТ (только для легендарных) ---
+        current_y = start_y
         if is_legendary:
             portrait_size = 160
             portrait_y = current_y
@@ -296,18 +243,20 @@ def create_hero_card(hero):
                               (x + portrait_size - 2, portrait_y + portrait_size - 2)], 
                              outline=pal["accent"], width=1)
                 
-                current_y += portrait_size + 20
+                current_y += portrait_size + 25
             else:
-                current_y += 160 + 20
+                current_y += 160 + 25
+        else:
+            current_y += 15
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
         name = hero.get("name", "Неизвестный герой")
-        font_name = load_font(44, "bold")
+        font_name = load_font(40, "bold")
         
         draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
-        current_y += 50
+        current_y += 48
 
         # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ ---
         y = current_y
@@ -315,24 +264,22 @@ def create_hero_card(hero):
         if len(book) > 28:
             book = book[:25] + "..."
         
-        font_book = load_font(24, "italic")
+        font_book = load_font(22, "italic")
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_book, anchor="mt")
         current_y += 30
 
         # --- АВТОР ---
         y = current_y
         author = hero.get("author", "Неизвестный автор")
-        font_author = load_font(20, "regular")
+        font_author = load_font(18, "regular")
         draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
-        current_y += 30
+        current_y += 35
 
-        # --- ОРНАМЕНТ ---
-        y = current_y
-        draw_vintage_ornament(draw, width//2, y, pal)
-        current_y += 30
-
-        # --- РЕДКОСТЬ ---
-        y = current_y
+        # --- РЕДКОСТЬ (опущена ближе к рамке) ---
+        # Рассчитываем расстояние до низа
+        remaining = height - current_y - 35  # оставляем 35px до рамки
+        star_y = current_y + remaining - 10
+        
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
             "эпический": "ЭПИЧЕСКИЙ",
@@ -340,7 +287,7 @@ def create_hero_card(hero):
             "обычный": "ОБЫЧНЫЙ"
         }
         rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-        font_rare = load_font(22, "bold")
+        font_rare = load_font(20, "bold")
         
         colors_rare = {
             "легендарный": (200, 160, 80),
@@ -353,19 +300,10 @@ def create_hero_card(hero):
         stars_count = {"легендарный": 5, "эпический": 4, "редкий": 3, "обычный": 2}
         stars = stars_count.get(rarity, 2)
         
-        star_y = y - 3
         draw_stars(draw, width//2, star_y, stars, color)
         
-        draw.text((width//2 + 1, y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
-        draw.text((width//2, y), rarity_text, fill=color, font=font_rare, anchor="mt")
-        current_y += 35
-
-        # --- ФУТЕР ---
-        y = current_y
-        font_footer = load_font(13, "italic")
-        draw.text((width//2, y), "Из собрания литературных героев", 
-                 fill=(pal["sub"][0], pal["sub"][1], pal["sub"][2], 160), 
-                 font=font_footer, anchor="mt")
+        draw.text((width//2 + 1, star_y + 25, rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
+        draw.text((width//2, star_y + 25), rarity_text, fill=color, font=font_rare, anchor="mt")
         
         enhancer = ImageEnhance.Sharpness(img)
         img = enhancer.enhance(1.5)
