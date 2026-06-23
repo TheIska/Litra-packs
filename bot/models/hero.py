@@ -5,12 +5,12 @@
 # ============================================================
 
 HEROES_BY_NUMBER = {
-    # ==================== ЛЕГЕНДАРНЫЕ (5) - ВСЁ ПО 85 ====================
-    1: {"name": "Александр Пушкин", "book": "Евгений Онегин", "author": "1799-1837", "rarity": "легендарный", "portrait": "pushkin.png", "card_number": 1, "strength": 85, "intelligence": 85, "kindness": 85},
-    2: {"name": "Михаил Лермонтов", "book": "Герой нашего времени", "author": "1814-1841", "rarity": "легендарный", "portrait": "lermontov.png", "card_number": 2, "strength": 85, "intelligence": 85, "kindness": 85},
-    3: {"name": "Николай Гоголь", "book": "Мёртвые души", "author": "1809-1852", "rarity": "легендарный", "portrait": "gogol.png", "card_number": 3, "strength": 85, "intelligence": 85, "kindness": 85},
-    4: {"name": "Фёдор Достоевский", "book": "Преступление и наказание", "author": "1821-1881", "rarity": "легендарный", "portrait": "dostoevsky.png", "card_number": 4, "strength": 85, "intelligence": 85, "kindness": 85},
-    5: {"name": "Иван Тургенев", "book": "Отцы и дети", "author": "1818-1883", "rarity": "легендарный", "portrait": "turgenev.png", "card_number": 5, "strength": 85, "intelligence": 85, "kindness": 85},
+    # ==================== ЛЕГЕНДАРНЫЕ (5) - ВСЁ ПО 90 ====================
+    1: {"name": "Александр Пушкин", "book": "Евгений Онегин", "author": "1799-1837", "rarity": "легендарный", "portrait": "pushkin.png", "card_number": 1, "strength": 90, "intelligence": 90, "kindness": 90},
+    2: {"name": "Михаил Лермонтов", "book": "Герой нашего времени", "author": "1814-1841", "rarity": "легендарный", "portrait": "lermontov.png", "card_number": 2, "strength": 90, "intelligence": 90, "kindness": 90},
+    3: {"name": "Николай Гоголь", "book": "Мёртвые души", "author": "1809-1852", "rarity": "легендарный", "portrait": "gogol.png", "card_number": 3, "strength": 90, "intelligence": 90, "kindness": 90},
+    4: {"name": "Фёдор Достоевский", "book": "Преступление и наказание", "author": "1821-1881", "rarity": "легендарный", "portrait": "dostoevsky.png", "card_number": 4, "strength": 90, "intelligence": 90, "kindness": 90},
+    5: {"name": "Иван Тургенев", "book": "Отцы и дети", "author": "1818-1883", "rarity": "легендарный", "portrait": "turgenev.png", "card_number": 5, "strength": 90, "intelligence": 90, "kindness": 90},
 
     # ==================== А.С. ПУШКИН ====================
     # --- Евгений Онегин ---
