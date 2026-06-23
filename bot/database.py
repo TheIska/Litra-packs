@@ -1,15 +1,19 @@
+# bot/database.py
+
 import sqlite3
 import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 
-# Определяем путь к базе данных
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'bot_data.db')
+# Путь к базе данных
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'bot_data.db')
 
 def get_connection():
     """Возвращает соединение с базой данных"""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    db_dir = os.path.dirname(DB_PATH)
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_db():
@@ -48,6 +52,7 @@ def init_db():
     
     conn.commit()
     conn.close()
+    print(f"✅ База данных инициализирована: {DB_PATH}")
 
 def migrate_db():
     """Добавляет недостающие колонки"""
@@ -86,7 +91,6 @@ def get_user(user_id: int) -> Dict[str, Any]:
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем колонки
     c.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -96,11 +100,6 @@ def get_user(user_id: int) -> Dict[str, Any]:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_last_date TEXT")
     if "daily_quiz_done" not in columns:
         c.execute("ALTER TABLE users ADD COLUMN daily_quiz_done INTEGER DEFAULT 0")
-    
-    c.execute("PRAGMA table_info(collection)")
-    collection_columns = [col[1] for col in c.fetchall()]
-    if "card_number" not in collection_columns:
-        c.execute("ALTER TABLE collection ADD COLUMN card_number INTEGER DEFAULT 0")
     
     c.execute("""
         SELECT last_free_pack, wins, losses, rating, coins, 
@@ -159,6 +158,7 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     c = conn.cursor()
     c.execute("SELECT hero_key, hero_data, card_number FROM collection WHERE user_id = ?", (user_id,))
     rows = c.fetchall()
+    print(f"🔍 get_collection: найдено {len(rows)} записей для user {user_id}")
     result = {}
     for key, data, number in rows:
         hero = json.loads(data)
@@ -168,30 +168,22 @@ def get_collection(user_id: int) -> Dict[str, Dict]:
     return result
 
 def add_hero_to_collection(user_id: int, hero: Dict) -> None:
-    """Добавляет героя в коллекцию с фиксированным номером"""
+    """Добавляет героя в коллекцию"""
     hero_key = f"{hero['author']} – {hero['name']}"
     hero_number = hero.get('card_number', 0)
+    
+    print(f"📝 Добавляем героя: {hero_key}, номер: {hero_number}")
     
     conn = get_connection()
     c = conn.cursor()
     
-    # Проверяем, есть ли уже такая карта
-    c.execute("SELECT card_number FROM collection WHERE user_id = ? AND hero_key = ?", (user_id, hero_key))
-    existing = c.fetchone()
-    
-    if existing:
-        c.execute(
-            "UPDATE collection SET hero_data = ? WHERE user_id = ? AND hero_key = ?",
-            (json.dumps(hero, ensure_ascii=False), user_id, hero_key)
-        )
-    else:
-        c.execute(
-            "INSERT INTO collection (user_id, hero_key, hero_data, card_number) VALUES (?, ?, ?, ?)",
-            (user_id, hero_key, json.dumps(hero, ensure_ascii=False), hero_number)
-        )
-    
+    c.execute(
+        "INSERT OR REPLACE INTO collection (user_id, hero_key, hero_data, card_number) VALUES (?, ?, ?, ?)",
+        (user_id, hero_key, json.dumps(hero, ensure_ascii=False), hero_number)
+    )
     conn.commit()
     conn.close()
+    print(f"✅ Герой сохранён в БД")
 
 def update_last_free_pack(user_id: int, timestamp: datetime) -> None:
     """Обновляет время последнего бесплатного пака"""
@@ -344,42 +336,6 @@ def get_heroes_by_rarity(user_id: int) -> Dict[str, int]:
             pass
     return result
 
-def get_collection_sorted(user_id: int, limit: int = 20, offset: int = 0) -> list:
-    """Получает коллекцию с пагинацией, отсортированную по номеру карты"""
-    conn = get_connection()
-    c = conn.cursor()
-    
-    c.execute("PRAGMA table_info(collection)")
-    columns = [col[1] for col in c.fetchall()]
-    
-    if "card_number" in columns:
-        c.execute("""
-            SELECT hero_key, hero_data, card_number 
-            FROM collection 
-            WHERE user_id = ? 
-            ORDER BY card_number 
-            LIMIT ? OFFSET ?
-        """, (user_id, limit, offset))
-    else:
-        c.execute("""
-            SELECT hero_key, hero_data, id 
-            FROM collection 
-            WHERE user_id = ? 
-            ORDER BY id 
-            LIMIT ? OFFSET ?
-        """, (user_id, limit, offset))
-    
-    rows = c.fetchall()
-    conn.close()
-    
-    result = []
-    for key, data, number in rows:
-        hero = json.loads(data)
-        hero['card_number'] = number or 0
-        hero['hero_key'] = key
-        result.append(hero)
-    return result
-
 def get_card_by_number(user_id: int, number: int) -> Optional[Dict]:
     """Получает карту по номеру"""
     conn = get_connection()
@@ -392,6 +348,7 @@ def get_card_by_number(user_id: int, number: int) -> Optional[Dict]:
     """, (user_id, number))
     row = c.fetchone()
     conn.close()
+    print(f"🔍 get_card_by_number: user={user_id}, number={number}, found={row is not None}")
     if row:
         hero = json.loads(row[0])
         hero['card_number'] = row[2] or 0
@@ -400,7 +357,6 @@ def get_card_by_number(user_id: int, number: int) -> Optional[Dict]:
     return None
 
 def get_daily_quiz_status(user_id: int) -> Dict[str, Any]:
-    """Возвращает статус ежедневной викторины"""
     user = get_user(user_id)
     return {
         "streak": user.get("daily_quiz_streak", 0),
@@ -409,7 +365,6 @@ def get_daily_quiz_status(user_id: int) -> Dict[str, Any]:
     }
 
 def reset_daily_quiz(user_id: int) -> None:
-    """Сбрасывает статус викторины (для тестов)"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -421,7 +376,6 @@ def reset_daily_quiz(user_id: int) -> None:
     conn.close()
 
 def reset_user_data(user_id: int) -> None:
-    """Сбрасывает все данные пользователя (для отладки)"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM collection WHERE user_id = ?", (user_id,))
