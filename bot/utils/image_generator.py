@@ -218,14 +218,14 @@ def create_hero_card(hero):
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- НОМЕР КАРТЫ ---
-        font_number = load_font(16, "bold")
+        # --- НОМЕР КАРТЫ (ЗА РАМКОЙ, В ПРАВОМ ВЕРХНЕМ УГЛУ) ---
+        font_number = load_font(20, "bold")
         number_text = f"№ {card_number:03d}"
-        draw.text((width - 30, 22), number_text, fill=pal["border"], font=font_number, anchor="rt")
+        draw.text((width - 20, 8), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS ПРЯМ НАД РАМКОЙ ---
-        font_title = load_font(16, "italic")
-        draw.text((width//2, p - 12), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
+        # --- LITRA PACKS (ПОВЫШЕ) ---
+        font_title = load_font(18, "italic")
+        draw.text((width//2, 5), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
 
         # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
         corner_size = 18
@@ -240,7 +240,7 @@ def create_hero_card(hero):
         if is_legendary:
             content_height = 150 + 25 + 48 + 30 + 35
         else:
-            content_height = 50 + 48 + 30 + 35
+            content_height = 55 + 48 + 30 + 35
         
         content_start = (height - p - 10 - content_height) // 2 + 10
         current_y = content_start
@@ -274,15 +274,17 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
+        # Используем символы вместо эмодзи: ⚔ Сила, 🧠 Ум, ❤ Доброта
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
             kindness = hero.get('kindness', random.randint(30, 99))
             
-            stats_text = f"💪{strength}  🧠{intelligence}  ❤️{kindness}"
-            font_stats = load_font(20, "bold")
-            draw.text((width//2, current_y), stats_text, fill=pal["accent"], font=font_stats, anchor="mt")
-            current_y += 50
+            # Увеличиваем шрифт и поднимаем выше
+            font_stats = load_font(28, "bold")
+            stats_text = f"⚔{strength}  🧠{intelligence}  ❤{kindness}"
+            draw.text((width//2, current_y - 5), stats_text, fill=pal["accent"], font=font_stats, anchor="mt")
+            current_y += 55
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
