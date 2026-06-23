@@ -30,11 +30,9 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         total_heroes = get_total_heroes()
         total_pages = (total_heroes - 1) // CARDS_PER_PAGE + 1
         
-        # Получаем коллекцию пользователя
         collection = get_collection(user_id)
         print(f"📊 Коллекция пользователя {user_id}: {len(collection)} карт")
         
-        # Собираем номера выбитых карт
         collected_numbers = set()
         for hero in collection.values():
             number = hero.get('card_number', 0)
@@ -43,7 +41,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         print(f"📊 Всего выбито: {len(collected_numbers)}/{total_heroes}")
         
-        # Получаем всех героев для текущей страницы
         start_idx = page * CARDS_PER_PAGE
         end_idx = min(start_idx + CARDS_PER_PAGE, total_heroes)
         sorted_heroes = sorted(HEROES_BY_NUMBER.items())
@@ -75,7 +72,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 callback_data = f"album_card_{number}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
-        # Кнопки навигации
         nav_buttons = []
         if page > 0:
             nav_buttons.append(InlineKeyboardButton("◀️ Назад", callback_data="album_prev"))
@@ -84,7 +80,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         if nav_buttons:
             keyboard.append(nav_buttons)
         
-        # Быстрые переходы по номерам
         number_buttons = []
         for i in range(1, 10):
             num = i * 25
@@ -127,7 +122,6 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         print(f"🟣 album_navigation вызван, действие: {action}")
         
-        # ЕСЛИ ЭТО КАРТОЧКА - ПРОПУСКАЕМ!
         if action.startswith("album_card_"):
             print("🟣 Это карточка! Пропускаем для show_card_by_number")
             return
@@ -136,17 +130,13 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         if action == "album_prev":
             context.user_data['album_page'] = context.user_data.get('album_page', 0) - 1
-            print(f"🟣 Страница: {context.user_data['album_page']}")
         elif action == "album_next":
             context.user_data['album_page'] = context.user_data.get('album_page', 0) + 1
-            print(f"🟣 Страница: {context.user_data['album_page']}")
         elif action.startswith("album_goto_"):
             number = int(action.split("_")[2])
             page = (number - 1) // CARDS_PER_PAGE
             context.user_data['album_page'] = page
-            print(f"🟣 Переход к {number}, страница {page}")
         else:
-            print(f"🟣 Неизвестное действие: {action}")
             return
         
         await show_album(update, context)
@@ -164,7 +154,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         query = update.callback_query
         print(f"🔴 query.data: {query.data}")
         
-        # ОТВЕЧАЕМ НА CALLBACK СРАЗУ!
         try:
             await query.answer()
             print("✅ Ответили на callback")
@@ -177,10 +166,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         number = int(query.data.split("_")[2])
         print(f"🔍 Номер карты: {number}")
         
-        # Получаем карту из БД
         card = get_card_by_number(user_id, number)
-        
-        # Получаем информацию о герое из словаря
         hero_info = get_hero_by_number(number)
         
         print(f"📊 card из БД: {card is not None}")
@@ -196,7 +182,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         if card:
             try:
                 print(f"🎴 Генерируем карточку для {hero_info['name']}")
-                # Используем hero_info для генерации карточки (правильные данные)
                 image_bytes = create_hero_card(hero_info)
                 
                 if hasattr(image_bytes, 'getvalue'):

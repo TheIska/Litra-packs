@@ -1,3 +1,5 @@
+# bot/main.py
+
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
@@ -74,8 +76,7 @@ def main():
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
     # ========== АЛЬБОМ ==========
-    # ВАЖНО: СНАЧАЛА БОЛЕЕ КОНКРЕТНЫЕ ОБРАБОТЧИКИ!
-    app.add_handler(CallbackQueryHandler(show_card_by_number, pattern="^album_card_"))  # СНАЧАЛА ЭТОТ
+    app.add_handler(CallbackQueryHandler(show_card_by_number, pattern="^album_card_"))
     app.add_handler(CallbackQueryHandler(album_back, pattern="^album_back$"))
     app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
     app.add_handler(CallbackQueryHandler(show_album, pattern="^album$"))

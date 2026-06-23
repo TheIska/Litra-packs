@@ -1,3 +1,5 @@
+# bot/handlers/pack.py
+
 import random
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -138,6 +140,7 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
+# Обработчики
 async def free_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await open_pack(update, context, "free")
 
