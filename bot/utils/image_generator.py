@@ -223,9 +223,9 @@ def create_hero_card(hero):
         number_text = f"№ {card_number:03d}"
         draw.text((width - 5, 5), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS (В ЦЕНТРЕ НАД РАМКОЙ, УВЕЛИЧЕН) ---
-        font_title = load_font(24, "bold")
-        draw.text((width//2, 8), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
+        # --- LITRA PACKS (МАКСИМАЛЬНО ВВЕРХУ) ---
+        font_title = load_font(18, "bold")
+        draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
         # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
         corner_size = 18
@@ -235,7 +235,7 @@ def create_hero_card(hero):
         draw_corner_ornament(draw, width - p - 8, height - p - 8, pal, corner_size, "br")
 
         # --- ОСНОВНОЙ КОНТЕНТ ---
-        start_y = 95
+        start_y = 80
         
         if is_legendary:
             content_height = 150 + 25 + 60 + 48 + 30 + 35
@@ -281,11 +281,11 @@ def create_hero_card(hero):
             
             font_stats = load_font(44, "bold")
             
-            # ЭМОДЗИ + ЧИСЛА
-            stats_text = f"⚔ {strength}  🧠 {intelligence}  ❤ {kindness}"
+            # ЭМОДЗИ: 💪 Сила, 🧠 Интеллект, ❤️ Доброта
+            stats_text = f"💪 {strength}  🧠 {intelligence}  ❤️ {kindness}"
             
-            # Поднимаем характеристики выше
-            center_y = current_y - 25
+            # ПОДНИМАЕМ ТОЛЬКО ХАРАКТЕРИСТИКИ
+            center_y = current_y - 30
             
             draw.text((width//2, center_y), stats_text, fill=(0, 0, 0), font=font_stats, anchor="mt")
             
