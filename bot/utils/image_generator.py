@@ -223,9 +223,9 @@ def create_hero_card(hero):
         number_text = f"№ {card_number:03d}"
         draw.text((width - 5, 5), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS (ЗА РАМКОЙ, В ЛЕВЫЙ ВЕРХНИЙ УГОЛ) ---
-        font_title = load_font(14, "italic")
-        draw.text((5, 8), "Litra Packs", fill=pal["accent"], font=font_title, anchor="lt")
+        # --- LITRA PACKS (В ЦЕНТРЕ НАД РАМКОЙ, УВЕЛИЧЕН) ---
+        font_title = load_font(24, "bold")
+        draw.text((width//2, 8), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
         # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
         corner_size = 18
@@ -235,7 +235,7 @@ def create_hero_card(hero):
         draw_corner_ornament(draw, width - p - 8, height - p - 8, pal, corner_size, "br")
 
         # --- ОСНОВНОЙ КОНТЕНТ ---
-        start_y = 80
+        start_y = 95
         
         if is_legendary:
             content_height = 150 + 25 + 60 + 48 + 30 + 35
@@ -274,23 +274,22 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
-        # МЕЧИ, МОЗГ И СЕРДЦЕ
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
             kindness = hero.get('kindness', random.randint(30, 99))
             
-            font_stats = load_font(42, "bold")
+            font_stats = load_font(44, "bold")
             
-            # Символы: ⚔ - меч, 🧠 - мозг, ❤ - сердце
+            # ЭМОДЗИ + ЧИСЛА
             stats_text = f"⚔ {strength}  🧠 {intelligence}  ❤ {kindness}"
             
-            # Поднимаем чуть выше
-            center_y = current_y - 10
+            # Поднимаем характеристики выше
+            center_y = current_y - 25
             
             draw.text((width//2, center_y), stats_text, fill=(0, 0, 0), font=font_stats, anchor="mt")
             
-            current_y = center_y + 55
+            current_y = center_y + 65
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
