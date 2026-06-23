@@ -276,8 +276,7 @@ def create_hero_card(hero):
         current_y += 35
 
         # --- РЕДКОСТЬ (опущена ближе к рамке) ---
-        # Рассчитываем расстояние до низа
-        remaining = height - current_y - 35  # оставляем 35px до рамки
+        remaining = height - current_y - 35
         star_y = current_y + remaining - 10
         
         labels = {
@@ -302,7 +301,7 @@ def create_hero_card(hero):
         
         draw_stars(draw, width//2, star_y, stars, color)
         
-        draw.text((width//2 + 1, star_y + 25, rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
+        draw.text((width//2 + 1, star_y + 25), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
         draw.text((width//2, star_y + 25), rarity_text, fill=color, font=font_rare, anchor="mt")
         
         enhancer = ImageEnhance.Sharpness(img)
