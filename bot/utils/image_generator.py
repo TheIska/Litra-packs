@@ -11,6 +11,22 @@ def load_font(size, style="regular"):
     """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
+        
+        # Если запрошен шрифт с эмодзи - используем Symbola
+        if style == "emoji":
+            font_path = os.path.join(font_dir, "Symbola.ttf")
+            if os.path.exists(font_path):
+                print(f"✅ Загружен шрифт Symbola.ttf для эмодзи")
+                return ImageFont.truetype(font_path, size)
+            # Если Symbola нет - пробуем NotoColorEmoji
+            font_path = os.path.join(font_dir, "NotoColorEmoji.ttf")
+            if os.path.exists(font_path):
+                print(f"✅ Загружен шрифт NotoColorEmoji.ttf для эмодзи")
+                return ImageFont.truetype(font_path, size)
+            # Если ничего нет - используем обычный
+            print(f"⚠️ Шрифт с эмодзи не найден, использую обычный")
+            return load_font(size, "regular")
+        
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
         font_file = font_files.get(style, "regular.ttf")
         font_path = os.path.join(font_dir, font_file)
@@ -279,12 +295,13 @@ def create_hero_card(hero):
             intelligence = hero.get('intelligence', random.randint(30, 99))
             kindness = hero.get('kindness', random.randint(30, 99))
             
-            font_stats = load_font(44, "bold")
+            # ЗАГРУЖАЕМ ШРИФТ С ЭМОДЗИ (Symbola.ttf)
+            font_stats = load_font(44, "emoji")
             
             # ЭМОДЗИ: 💪 Сила, 🧠 Интеллект, ❤️ Доброта
-            stats_text = f"💪 {strength}  🧠 {intelligence}  ❤️ {kindness}"
+            stats_text = f"💪{strength}  🧠{intelligence}  ❤️{kindness}"
             
-            # ПОДНИМАЕМ ТОЛЬКО ХАРАКТЕРИСТИКИ
+            # Поднимаем характеристики выше
             center_y = current_y - 30
             
             draw.text((width//2, center_y), stats_text, fill=(0, 0, 0), font=font_stats, anchor="mt")
