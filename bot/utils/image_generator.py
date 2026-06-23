@@ -143,26 +143,6 @@ def draw_stars(draw, x, y, count, color):
         print(f"❌ Ошибка в draw_stars: {e}")
 
 
-def draw_corner_ornament(draw, x, y, pal, size=15, direction="tl"):
-    """Рисует угловой орнамент в нужном направлении"""
-    if direction == "tl":
-        start_angle, end_angle = 0, 90
-    elif direction == "tr":
-        start_angle, end_angle = 90, 180
-    elif direction == "bl":
-        start_angle, end_angle = 270, 360
-    else:
-        start_angle, end_angle = 180, 270
-    
-    for i in range(3, 0, -1):
-        s = size - (3 - i) * 4
-        if s > 4:
-            draw.arc([x - s, y - s, x + s, y + s], start_angle, end_angle, 
-                     fill=pal["border_light"], width=1)
-    
-    draw.ellipse([x - 1.5, y - 1.5, x + 1.5, y + 1.5], fill=pal["accent"])
-
-
 def create_hero_card(hero):
     """Создаёт карточку героя с номером"""
     try:
@@ -227,13 +207,6 @@ def create_hero_card(hero):
         font_title = load_font(18, "bold")
         draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
-        # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
-        corner_size = 18
-        draw_corner_ornament(draw, p + 8, p + 8, pal, corner_size, "tl")
-        draw_corner_ornament(draw, width - p - 8, p + 8, pal, corner_size, "tr")
-        draw_corner_ornament(draw, p + 8, height - p - 8, pal, corner_size, "bl")
-        draw_corner_ornament(draw, width - p - 8, height - p - 8, pal, corner_size, "br")
-
         # --- ОСНОВНОЙ КОНТЕНТ ---
         start_y = 80
         
@@ -274,7 +247,7 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
-        # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ
+        # ПОДНИМАЕМ ПРЯМО К РАМКЕ (НО НЕ ВПЛОТНУЮ)
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
@@ -288,9 +261,10 @@ def create_hero_card(hero):
             col2_x = third + third // 2
             col3_x = third * 2 + third // 2
             
-            stats_y = current_y - 20
+            # ПОДНИМАЕМ К САМОЙ РАМКЕ (отступ 10px от рамки)
+            stats_y = p + 10
             
-            # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ (ГАРАНТИРОВАННО ОТОБРАЖАЮТСЯ)
+            # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ
             draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
             draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
             draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
