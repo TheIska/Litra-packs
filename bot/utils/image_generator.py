@@ -163,42 +163,6 @@ def draw_corner_ornament(draw, x, y, pal, size=15, direction="tl"):
     draw.ellipse([x - 1.5, y - 1.5, x + 1.5, y + 1.5], fill=pal["accent"])
 
 
-def draw_border_dots(draw, width, height, pal, margin=18):
-    """Рисует маленькие декоративные точки между рамкой и краем карты"""
-    dot_spacing = 15
-    dot_size = 1.5
-    
-    # Верхняя сторона (только до угловых орнаментов)
-    for x in range(margin + 35, width - margin - 35, dot_spacing):
-        draw.ellipse([x - dot_size, margin - 6, x + dot_size, margin - 3], 
-                     fill=pal["border_light"])
-    
-    # Нижняя сторона
-    for x in range(margin + 35, width - margin - 35, dot_spacing):
-        draw.ellipse([x - dot_size, height - margin - 3, x + dot_size, height - margin], 
-                     fill=pal["border_light"])
-    
-    # Левая сторона
-    for y in range(margin + 35, height - margin - 35, dot_spacing):
-        draw.ellipse([margin - 6, y - dot_size, margin - 3, y + dot_size], 
-                     fill=pal["border_light"])
-    
-    # Правая сторона
-    for y in range(margin + 35, height - margin - 35, dot_spacing):
-        draw.ellipse([width - margin - 3, y - dot_size, width - margin, y + dot_size], 
-                     fill=pal["border_light"])
-
-
-def draw_decorative_line(draw, x1, y1, x2, y2, pal):
-    """Рисует декоративную линию с точками"""
-    draw.line([(x1, y1), (x2, y2)], fill=pal["border_light"], width=1)
-    
-    # Точки на линии
-    step = 20
-    for x in range(x1 + 10, x2 - 10, step):
-        draw.ellipse([x - 1.5, y1 - 1.5, x + 1.5, y1 + 1.5], fill=pal["accent"])
-
-
 def create_hero_card(hero):
     """Создаёт карточку героя с номером"""
     try:
@@ -254,9 +218,6 @@ def create_hero_card(hero):
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- ТОЧКИ МЕЖДУ РАМКОЙ И КРАЕМ ---
-        draw_border_dots(draw, width, height, pal, p)
-
         # --- НОМЕР КАРТЫ ---
         font_number = load_font(16, "bold")
         number_text = f"№ {card_number:03d}"
@@ -279,12 +240,12 @@ def create_hero_card(hero):
         if is_legendary:
             content_height = 150 + 25 + 48 + 30 + 35
         else:
-            content_height = 48 + 30 + 35
+            content_height = 50 + 48 + 30 + 35
         
         content_start = (height - p - 10 - content_height) // 2 + 10
         current_y = content_start
 
-        # --- ПОРТРЕТ ---
+        # --- ПОРТРЕТ (только для легендарных) ---
         if is_legendary:
             portrait_size = 150
             portrait_y = current_y
@@ -312,9 +273,16 @@ def create_hero_card(hero):
             else:
                 current_y += 150 + 25
 
-        # --- ДЕКОРАТИВНАЯ ЛИНИЯ ПЕРЕД ИМЕНЕМ ---
-        line_y = current_y - 8
-        draw_decorative_line(draw, 60, line_y, width - 60, line_y, pal)
+        # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
+        if not is_legendary:
+            strength = hero.get('strength', random.randint(30, 99))
+            intelligence = hero.get('intelligence', random.randint(30, 99))
+            kindness = hero.get('kindness', random.randint(30, 99))
+            
+            stats_text = f"💪{strength}  🧠{intelligence}  ❤️{kindness}"
+            font_stats = load_font(20, "bold")
+            draw.text((width//2, current_y), stats_text, fill=pal["accent"], font=font_stats, anchor="mt")
+            current_y += 50
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
@@ -342,12 +310,9 @@ def create_hero_card(hero):
         draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
         current_y += 35
 
-        # --- ДЕКОРАТИВНАЯ ЛИНИЯ ПЕРЕД РЕДКОСТЬЮ ---
-        rarity_y = height - p - 10 - 30 - 30
-        line_y = rarity_y - 12
-        draw_decorative_line(draw, 80, line_y, width - 80, line_y, pal)
-
         # --- РЕДКОСТЬ ---
+        rarity_y = height - p - 10 - 30
+        
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
             "эпический": "ЭПИЧЕСКИЙ",
