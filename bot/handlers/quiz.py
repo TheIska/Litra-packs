@@ -1,201 +1,311 @@
-# bot/handlers/quiz.py
-
-import random
-import asyncio
-from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, update_user, add_coins
-from ..models.questions import QUESTIONS
-from ..utils.helpers import shuffle_question, extract_work
+from ..models.questions import QUIZ_QUESTIONS
+import random
+import datetime
 
+# Хранилище активных викторин
 active_quizzes = {}
-MOSCOW_TZ = timezone(timedelta(hours=3))
 
-def get_moscow_date():
-    return datetime.now(MOSCOW_TZ).date()
+# Правильные ответы за викторину (для начисления монет)
+quiz_answers = {}
+QUIZ_QUESTIONS_COUNT = 5  # Количество вопросов за викторину
 
-
-async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Запускает викторину"""
     query = update.callback_query
     if query:
-        try:
-            await query.answer()
-        except Exception:
-            pass
+        await query.answer()
+        user_id = query.from_user.id
+        chat_id = query.message.chat_id
+        message_id = query.message.message_id
+    else:
+        user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        message_id = None
+
+    # Проверяем, есть ли уже активная викторина
+    if user_id in active_quizzes:
+        if query:
+            await query.edit_message_text(
+                "⏳ У тебя уже есть активная викторина! Отвечай на вопросы.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
+            )
+        else:
+            await update.message.reply_text(
+                "⏳ У тебя уже есть активная викторина! Отвечай на вопросы.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
+            )
+        return
+
+    # Проверяем ежедневный бонус
+    user = get_user(user_id)
+    today = datetime.datetime.now().date().isoformat()
+    last_date = user.get("daily_quiz_last_date")
+    
+    # Сбрасываем daily_quiz_done, если прошёл день
+    if last_date and last_date != today:
+        update_user(user_id, daily_quiz_done=0, daily_quiz_streak=0)
+        user = get_user(user_id)  # Обновляем данные
+    
+    # Проверяем, получал ли уже бонус сегодня
+    if user.get("daily_quiz_done", 0) >= 5:
+        if query:
+            await query.edit_message_text(
+                "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
+                f"💰 Твой баланс: {user['coins']} монет\n\n"
+                "Завтра в 00:00 бонусы обновятся! 🎉",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+            )
+        else:
+            await update.message.reply_text(
+                "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
+                f"💰 Твой баланс: {user['coins']} монет\n\n"
+                "Завтра в 00:00 бонусы обновятся! 🎉",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+            )
+        return
+
+    # Проверяем, сколько бонусов уже получено сегодня
+    bonus_count = user.get("daily_quiz_done", 0)
+    remaining = 5 - bonus_count
+
+    # Перемешиваем вопросы
+    questions = random.sample(QUIZ_QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUIZ_QUESTIONS)))
+    
+    # Сохраняем состояние викторины
+    quiz_data = {
+        "questions": questions,
+        "current": 0,
+        "score": 0,
+        "total": len(questions),
+        "bonus_count": bonus_count,
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "message_id": message_id
+    }
+    active_quizzes[user_id] = quiz_data
+    quiz_answers[user_id] = 0  # Счётчик правильных ответов за викторину
+
+    # Отправляем первый вопрос
+    await send_question(update, context, user_id, chat_id)
+
+
+async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int) -> None:
+    """Отправляет текущий вопрос викторины"""
+    quiz = active_quizzes.get(user_id)
+    if not quiz:
+        return
+
+    current = quiz["current"]
+    total = quiz["total"]
+    
+    if current >= total:
+        await finish_quiz(update, context, user_id)
+        return
+
+    question_data = quiz["questions"][current]
+    text = question_data["text"]
+    options = question_data["options"]
+    correct = question_data["correct"]
+
+    # Сохраняем правильный ответ для проверки
+    quiz["correct"] = correct
+
+    # Создаём клавиатуру
+    keyboard = []
+    for i, option in enumerate(options):
+        keyboard.append([InlineKeyboardButton(option, callback_data=f"qans_{user_id}_{i}")])
+
+    keyboard.append([InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")])
+
+    text_message = (
+        f"📝 *Вопрос {current + 1}/{total}*\n\n"
+        f"{text}\n\n"
+        f"💰 Бонус за правильный ответ: *50 монет*\n"
+        f"📊 Осталось бонусов за сегодня: *{5 - quiz['bonus_count']}*"
+    )
+
+    try:
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                text_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        else:
+            await context.bot.send_message(
+                chat_id,
+                text_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        print(f"❌ Ошибка отправки вопроса: {e}")
+        await context.bot.send_message(
+            chat_id,
+            text_message,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+
+
+async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает ответ на вопрос викторины"""
+    query = update.callback_query
+    data = query.data
+    
+    if not data.startswith("qans_"):
+        return
+    
+    try:
+        _, user_id_str, answer_idx = data.split("_")
+        user_id = int(user_id_str)
+        answer_idx = int(answer_idx)
+    except ValueError:
+        await query.answer("❌ Ошибка! Попробуйте снова.")
+        return
+
+    # Проверяем, что викторина активна
+    quiz = active_quizzes.get(user_id)
+    if not quiz:
+        await query.edit_message_text(
+            "❌ Викторина завершена или неактивна.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        )
+        return
+
+    # Проверяем, что ответ правильный
+    correct = quiz.get("correct")
+    is_correct = (answer_idx == correct)
+    
+    # Получаем данные пользователя
+    user = get_user(user_id)
+    today = datetime.datetime.now().date().isoformat()
+    
+    # Проверяем дату
+    if user.get("daily_quiz_last_date") != today:
+        update_user(user_id, daily_quiz_done=0, daily_quiz_streak=0)
+        user = get_user(user_id)
+    
+    # Проверяем, не исчерпан ли лимит бонусов
+    if user.get("daily_quiz_done", 0) >= 5:
+        await query.edit_message_text(
+            "✅ Ты уже получил все бонусы за сегодня!\n"
+            "Завтра в 00:00 бонусы обновятся. 🎉",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        )
+        del active_quizzes[user_id]
+        return
+
+    # Если ответ правильный и есть бонусы
+    if is_correct:
+        # Начисляем 50 монет
+        add_coins(user_id, 50)
+        
+        # Обновляем счётчик бонусов
+        new_done = user.get("daily_quiz_done", 0) + 1
+        update_user(user_id, 
+                    daily_quiz_done=new_done,
+                    daily_quiz_last_date=today,
+                    daily_quiz_streak=user.get("daily_quiz_streak", 0) + 1)
+        
+        # Обновляем quiz_data
+        quiz["bonus_count"] = new_done
+        
+        # Сообщаем о начислении
+        await query.edit_message_text(
+            f"✅ *Правильно!* +50 монет! 💰\n\n"
+            f"📊 Получено бонусов сегодня: {new_done}/5\n"
+            f"💰 Твой баланс: {user['coins'] + 50} монет",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1)
+    else:
+        await query.edit_message_text(
+            f"❌ *Неправильно.*\n\n"
+            f"Правильный ответ: {quiz['questions'][quiz['current']]['options'][correct]}",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.5)
+
+    # Переходим к следующему вопросу
+    quiz["current"] += 1
+    
+    if quiz["current"] >= quiz["total"]:
+        await finish_quiz(update, context, user_id)
+    else:
+        await send_question(update, context, user_id, query.message.chat_id)
+
+
+async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
+    """Завершает викторину"""
+    quiz = active_quizzes.pop(user_id, None)
+    quiz_answers.pop(user_id, None)
+    
+    if not quiz:
+        return
+    
+    user = get_user(user_id)
+    today = datetime.datetime.now().date().isoformat()
+    
+    keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+    
+    # Проверяем, все ли бонусы получены
+    done = user.get("daily_quiz_done", 0)
+    
+    if done >= 5:
+        text = (
+            f"🎉 *Викторина завершена!*\n\n"
+            f"💰 Ты получил все *5 бонусов* за сегодня!\n"
+            f"📊 Всего монет: *{user['coins']}*\n"
+            f"🔥 Серия: *{user.get('daily_quiz_streak', 0)}* дней\n\n"
+            "Завтра в 00:00 бонусы обновятся!"
+        )
+    else:
+        text = (
+            f"🎉 *Викторина завершена!*\n\n"
+            f"💰 Ты получил *{done}* бонусов из 5 сегодня\n"
+            f"📊 Всего монет: *{user['coins']}*\n"
+            f"🔥 Серия: *{user.get('daily_quiz_streak', 0)}* дней\n\n"
+            f"💡 Осталось бонусов: *{5 - done}*\n"
+            "Чтобы получить их, начни новую викторину!"
+        )
+    
+    await context.bot.send_message(
+        chat_id=quiz.get("chat_id", user_id),
+        text=text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Останавливает текущую викторину"""
+    query = update.callback_query
+    
+    if query:
         user_id = query.from_user.id
         chat_id = query.message.chat_id
     else:
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
-    for qid, quiz in active_quizzes.items():
-        if quiz["user_id"] == user_id and not quiz.get("is_finished", False):
-            await show_quiz_question(update, context, qid)
-            return
-    
-    all_questions = random.sample(QUESTIONS, len(QUESTIONS))
-    
-    quiz_id = f"quiz_{user_id}_{int(datetime.now().timestamp())}"
-    
-    active_quizzes[quiz_id] = {
-        "user_id": user_id,
-        "all_questions": all_questions,
-        "current_index": 0,
-        "correct_count": 0,
-        "rewarded_count": 0,
-        "wrong_total": 0,
-        "coins_earned": 0,
-        "is_finished": False,
-    }
-    
-    await show_quiz_question(update, context, quiz_id)
-
-
-async def show_quiz_question(update, context, quiz_id):
-    quiz = active_quizzes.get(quiz_id)
-    if not quiz or quiz.get("is_finished", False):
-        return
-    
-    user_id = quiz["user_id"]
-    all_questions = quiz["all_questions"]
-    current_index = quiz["current_index"]
-    
-    if current_index >= len(all_questions):
-        random.shuffle(all_questions)
-        quiz["current_index"] = 0
-        current_index = 0
-    
-    question = shuffle_question(all_questions[current_index])
-    
-    work = question.get("work", "")
-    if not work:
-        work = extract_work(question.get("text", ""))
-    
-    work_text = f"\n📖 {work}" if work else ""
-    
-    rewarded = quiz['rewarded_count']
-    remaining = 5 - rewarded
-    
-    text = (
-        f"📝 Викторина\n"
-        f"💰 50 монет за каждый из первых 5 правильных ответов\n"
-        f"✅ Правильных: {quiz['correct_count']} (осталось бонусов: {remaining})\n"
-        f"❌ Неправильных: {quiz['wrong_total']}\n"
-        f"💵 Заработано: {quiz['coins_earned']} монет\n\n"
-        f"{question['text']}"
-        f"{work_text}\n\n"
-        f"Выбери вариант ответа:"
-    )
-    
-    keyboard = []
-    for idx, option in enumerate(question["options"]):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f"qans|{quiz_id}|{idx}")])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    if update.callback_query:
-        await update.callback_query.edit_message_text(
-            text,
-            parse_mode=None,
-            reply_markup=reply_markup
-        )
-    else:
-        await context.bot.send_message(
-            user_id,
-            text,
-            parse_mode=None,
-            reply_markup=reply_markup
-        )
-
-
-async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    parts = data.split("|")
-    quiz_id = parts[1]
-    answer_idx = int(parts[2])
-    
-    quiz = active_quizzes.get(quiz_id)
-    if not quiz or quiz.get("is_finished", False):
-        await query.edit_message_text("❌ Викторина уже завершена.")
-        return
-    
-    user_id = quiz["user_id"]
-    all_questions = quiz["all_questions"]
-    current_index = quiz["current_index"]
-    
-    if current_index >= len(all_questions):
-        random.shuffle(all_questions)
-        quiz["current_index"] = 0
-        current_index = 0
-    
-    question = all_questions[current_index]
-    correct = question["correct"]
-    is_correct = (answer_idx == correct)
-    
-    correct_text = question["options"][correct]
-    
-    if is_correct:
-        quiz["correct_count"] += 1
+    if user_id in active_quizzes:
+        del active_quizzes[user_id]
+        quiz_answers.pop(user_id, None)
         
-        if quiz["rewarded_count"] < 5:
-            add_coins(user_id, 50)
-            quiz["coins_earned"] += 50
-            quiz["rewarded_count"] += 1
-            rewarded = quiz["rewarded_count"]
-            
-            await query.edit_message_text(
-                f"✅ Правильно!\n\n"
-                f"Правильный ответ: {correct_text}\n"
-                f"💰 +50 монет! ({rewarded}/5)\n"
-                f"💵 Всего заработано: {quiz['coins_earned']} монет",
-                parse_mode=None
-            )
+        text = "⏹️ *Викторина завершена!*"
+        keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+        
+        if query:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         else:
-            await query.edit_message_text(
-                f"✅ Правильно!\n\n"
-                f"Правильный ответ: {correct_text}\n"
-                f"💵 Всего заработано: {quiz['coins_earned']} монет\n\n"
-                f"Ты уже получил все 5 бонусов! Отвечай дальше для удовольствия.",
-                parse_mode=None
-            )
+            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     else:
-        quiz["wrong_total"] += 1
-        
-        await query.edit_message_text(
-            f"❌ Неправильно.\n\n"
-            f"Правильный ответ: {correct_text}\n"
-            f"💵 Всего заработано: {quiz['coins_earned']} монет\n\n"
-            f"Не расстраивайся! Отвечай дальше.",
-            parse_mode=None
-        )
-    
-    quiz["current_index"] += 1
-    
-    await asyncio.sleep(1.5)
-    await show_quiz_question(update, context, quiz_id)
-
-
-async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    
-    for quiz_id, quiz in list(active_quizzes.items()):
-        if quiz["user_id"] == user_id and not quiz.get("is_finished", False):
-            quiz["is_finished"] = True
-            earned = quiz["coins_earned"]
-            rewarded = quiz["rewarded_count"]
-            await update.message.reply_text(
-                f"🏁 Викторина завершена!\n\n"
-                f"💰 Ты заработал {earned} монет ({rewarded}/5 бонусов)\n"
-                f"✅ Правильных ответов: {quiz['correct_count']}\n"
-                f"❌ Неправильных: {quiz['wrong_total']}\n\n"
-                f"Отправь /quiz, чтобы начать заново",
-                parse_mode=None
-            )
-            active_quizzes.pop(quiz_id, None)
-            return
-    
-    await update.message.reply_text("❌ У тебя нет активной викторины.")
+        text = "❌ У тебя нет активной викторины."
+        if query:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]))
+        else:
+            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]))
