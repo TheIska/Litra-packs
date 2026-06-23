@@ -1,5 +1,3 @@
-# bot/utils/image_generator.py
-
 import io
 import os
 import random
@@ -143,18 +141,50 @@ def draw_stars(draw, x, y, count, color):
         print(f"❌ Ошибка в draw_stars: {e}")
 
 
-def draw_corner_ornament(draw, x, y, pal, size=20):
-    """Рисует угловой орнамент"""
-    # Маленький завиток в углу
-    for i in range(3):
-        s = size - i * 5
-        if s > 5:
-            draw.arc([x - s, y - s, x + s, y + s], 0, 90, fill=pal["border_light"], width=1)
+def draw_corner_ornament(draw, x, y, pal, size=20, direction="tl"):
+    """Рисует угловой орнамент в нужном направлении"""
+    # Определяем углы для дуги
+    if direction == "tl":  # верхний левый
+        start_angle, end_angle = 0, 90
+    elif direction == "tr":  # верхний правый
+        start_angle, end_angle = 90, 180
+    elif direction == "bl":  # нижний левый
+        start_angle, end_angle = 270, 360
+    else:  # нижний правый
+        start_angle, end_angle = 180, 270
     
-    # Точки
+    # Дуги
+    for i in range(3, 0, -1):
+        s = size - (3 - i) * 5
+        draw.arc([x - s, y - s, x + s, y + s], start_angle, end_angle, 
+                 fill=pal["border_light"], width=1)
+    
+    # Точки в углу
     draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=pal["accent"])
-    draw.ellipse([x - 6, y - 1, x - 4, y + 1], fill=pal["border_light"])
-    draw.ellipse([x - 1, y - 6, x + 1, y - 4], fill=pal["border_light"])
+
+
+def draw_border_dots(draw, width, height, pal, margin=18):
+    """Рисует декоративные точки между рамкой и краем карты"""
+    dot_spacing = 20
+    dot_size = 2
+    
+    # Верхняя и нижняя стороны
+    for x in range(margin + 30, width - margin - 30, dot_spacing):
+        # Верх
+        draw.ellipse([x - dot_size, margin - 8, x + dot_size, margin - 4], 
+                     fill=pal["border_light"])
+        # Низ
+        draw.ellipse([x - dot_size, height - margin - 4, x + dot_size, height - margin], 
+                     fill=pal["border_light"])
+    
+    # Левая и правая стороны
+    for y in range(margin + 30, height - margin - 30, dot_spacing):
+        # Лево
+        draw.ellipse([margin - 8, y - dot_size, margin - 4, y + dot_size], 
+                     fill=pal["border_light"])
+        # Право
+        draw.ellipse([width - margin - 4, y - dot_size, width - margin, y + dot_size], 
+                     fill=pal["border_light"])
 
 
 def create_hero_card(hero):
@@ -208,47 +238,42 @@ def create_hero_card(hero):
         img = create_vintage_texture(width, height)
         draw = ImageDraw.Draw(img)
 
-        # --- РАМКА С ОТСТУПОМ ---
-        margin = 30
-        p = margin
-        # Внешняя тонкая рамка
-        draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border_light"], width=1)
-        # Основная рамка
-        draw.rectangle([(p + 10, p + 10), (width - p - 10, height - p - 10)], outline=pal["border"], width=2)
+        # --- ОДНА РАМКА (как было) ---
+        p = 18
+        draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
-        corner_size = 25
-        corners = [
-            (p + 10, p + 10),
-            (width - p - 10, p + 10),
-            (p + 10, height - p - 10),
-            (width - p - 10, height - p - 10)
-        ]
-        for cx, cy in corners:
-            draw_corner_ornament(draw, cx, cy, pal, corner_size)
+        # --- ТОЧКИ МЕЖДУ РАМКОЙ И КРАЕМ ---
+        draw_border_dots(draw, width, height, pal, p)
 
         # --- НОМЕР КАРТЫ (в правом верхнем углу) ---
         font_number = load_font(16, "bold")
         number_text = f"№ {card_number:03d}"
-        draw.text((width - 40, 30), number_text, fill=pal["border"], font=font_number, anchor="rt")
+        draw.text((width - 30, 22), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- ЗАГОЛОВОК ---
-        y = 35
+        # --- LITRA PACKS НАД РАМКОЙ ---
         font_title = load_font(18, "italic")
-        draw.text((width//2, y), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
+        draw.text((width//2, 8), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
+
+        # --- УГЛОВЫЕ ОРНАМЕНТЫ (правильные направления) ---
+        corner_size = 22
+        # Верхний левый
+        draw_corner_ornament(draw, p + 10, p + 10, pal, corner_size, "tl")
+        # Верхний правый
+        draw_corner_ornament(draw, width - p - 10, p + 10, pal, corner_size, "tr")
+        # Нижний левый
+        draw_corner_ornament(draw, p + 10, height - p - 10, pal, corner_size, "bl")
+        # Нижний правый
+        draw_corner_ornament(draw, width - p - 10, height - p - 10, pal, corner_size, "br")
 
         # --- ОСНОВНОЙ КОНТЕНТ (по центру) ---
-        # Начинаем с отступа от заголовка
         start_y = 75
         
-        # Вычисляем центр для контента
         if is_legendary:
-            content_height = 160 + 25 + 48 + 30 + 35  # портрет + отступы
+            content_height = 150 + 25 + 48 + 30 + 35
         else:
-            content_height = 48 + 30 + 35  # имя + книга + автор
+            content_height = 48 + 30 + 35
         
-        # Центрируем контент
-        content_start = (height - margin - 10 - content_height) // 2 + 20
+        content_start = (height - p - 10 - content_height) // 2 + 10
         current_y = content_start
 
         # --- ПОРТРЕТ (только для легендарных) ---
@@ -268,7 +293,6 @@ def create_hero_card(hero):
                 x = (width - portrait_size) // 2
                 img.paste(portrait, (x, portrait_y), portrait)
                 
-                # Рамка вокруг портрета
                 draw.ellipse([(x - 4, portrait_y - 4), 
                               (x + portrait_size + 4, portrait_y + portrait_size + 4)], 
                              outline=pal["border"], width=2)
@@ -307,7 +331,7 @@ def create_hero_card(hero):
         current_y += 35
 
         # --- РЕДКОСТЬ (над нижней рамкой) ---
-        rarity_y = height - margin - 10 - 30 - 25  # 30px до рамки
+        rarity_y = height - p - 10 - 30 - 25
         
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
@@ -316,7 +340,7 @@ def create_hero_card(hero):
             "обычный": "ОБЫЧНЫЙ"
         }
         rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-        font_rare = load_font(22, "bold")  # Увеличенный шрифт
+        font_rare = load_font(22, "bold")
         
         colors_rare = {
             "легендарный": (200, 160, 80),
