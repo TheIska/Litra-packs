@@ -247,7 +247,7 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
-        # ПОДНИМАЕМ ПРЯМО К РАМКЕ (НО НЕ ВПЛОТНУЮ)
+        # ОСТАВЛЯЕМ ТАМ ГДЕ БЫЛИ (ПОДНЯТЫ К РАМКЕ)
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
@@ -255,16 +255,13 @@ def create_hero_card(hero):
             
             font_stats = load_font(38, "bold")
             
-            # РАЗДЕЛЯЕМ НА 3 КОЛОНКИ
             third = width // 3
             col1_x = third // 2
             col2_x = third + third // 2
             col3_x = third * 2 + third // 2
             
-            # ПОДНИМАЕМ К САМОЙ РАМКЕ (отступ 10px от рамки)
             stats_y = p + 10
             
-            # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ
             draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
             draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
             draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
@@ -280,7 +277,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
         current_y += 48
 
-        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ ---
+        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ (В ЦЕНТР) ---
         y = current_y
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
         if len(book) > 28:
@@ -290,7 +287,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_book, anchor="mt")
         current_y += 30
 
-        # --- АВТОР ---
+        # --- АВТОР (В ЦЕНТР) ---
         y = current_y
         author = hero.get("author", "Неизвестный автор")
         font_author = load_font(17, "regular")
