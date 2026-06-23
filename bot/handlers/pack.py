@@ -1,5 +1,3 @@
-# bot/handlers/pack.py
-
 import random
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
