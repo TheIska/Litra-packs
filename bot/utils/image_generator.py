@@ -207,33 +207,31 @@ def create_hero_card(hero):
         font_title = load_font(18, "bold")
         draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
-        # --- ХАРАКТЕРИСТИКИ (ДЛЯ ВСЕХ, КРОМЕ ЛЕГЕНДАРНЫХ У ВЕРХНЕЙ РАМКИ) ---
+        # --- ХАРАКТЕРИСТИКИ (ДЛЯ ВСЕХ ГЕРОЕВ, У ВЕРХНЕЙ РАМКИ) ---
         stats_y = p + 10
-        current_y = stats_y + 70
         
-        if not is_legendary:
-            strength = hero.get('strength', random.randint(30, 99))
-            intelligence = hero.get('intelligence', random.randint(30, 99))
-            kindness = hero.get('kindness', random.randint(30, 99))
-            
-            font_stats = load_font(38, "bold")
-            
-            third = width // 3
-            col1_x = third // 2
-            col2_x = third + third // 2
-            col3_x = third * 2 + third // 2
-            
-            draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            
-            current_y = stats_y + 70
+        strength = hero.get('strength', random.randint(30, 99))
+        intelligence = hero.get('intelligence', random.randint(30, 99))
+        kindness = hero.get('kindness', random.randint(30, 99))
+        
+        font_stats = load_font(38, "bold")
+        
+        third = width // 3
+        col1_x = third // 2
+        col2_x = third + third // 2
+        col3_x = third * 2 + third // 2
+        
+        draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+        draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+        draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+        
+        current_y = stats_y + 70
 
         # --- ОСНОВНОЙ БЛОК (ПОРТРЕТ, ИМЯ, КНИГА, АВТОР) - ПО ЦЕНТРУ ВЕРТИКАЛЬНО ---
         # Для легендарных - увеличиваем портрет и рамку
         if is_legendary:
-            portrait_size = 200  # УВЕЛИЧЕННЫЙ ПОРТРЕТ (было 150)
-            portrait_margin = 8   # УВЕЛИЧЕННАЯ РАМКА (было 4)
+            portrait_size = 200  # УВЕЛИЧЕННЫЙ ПОРТРЕТ
+            portrait_margin = 8   # УВЕЛИЧЕННАЯ РАМКА
             block_height = portrait_size + portrait_margin * 2 + 25 + 48 + 30 + 35
         else:
             portrait_size = 0
@@ -297,27 +295,6 @@ def create_hero_card(hero):
         font_author = load_font(17, "regular")
         draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
         current_y += 35
-
-        # --- ХАРАКТЕРИСТИКИ ДЛЯ ЛЕГЕНДАРНЫХ (ВНИЗУ ПОД АВТОРОМ) ---
-        if is_legendary:
-            strength = hero.get('strength', 85)
-            intelligence = hero.get('intelligence', 85)
-            kindness = hero.get('kindness', 85)
-            
-            font_stats_legend = load_font(32, "bold")
-            
-            third = width // 3
-            col1_x = third // 2
-            col2_x = third + third // 2
-            col3_x = third * 2 + third // 2
-            
-            stats_y_legend = current_y + 10
-            
-            draw.text((col1_x, stats_y_legend), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats_legend, anchor="mt")
-            draw.text((col2_x, stats_y_legend), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats_legend, anchor="mt")
-            draw.text((col3_x, stats_y_legend), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats_legend, anchor="mt")
-            
-            current_y = stats_y_legend + 50
 
         # --- РЕДКОСТЬ ---
         rarity_y = height - p - 10 - 30
