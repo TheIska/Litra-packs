@@ -11,22 +11,6 @@ def load_font(size, style="regular"):
     """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
-        
-        # Если запрошен шрифт с эмодзи - используем Symbola
-        if style == "emoji":
-            font_path = os.path.join(font_dir, "Symbola.ttf")
-            if os.path.exists(font_path):
-                print(f"✅ Загружен шрифт Symbola.ttf для эмодзи")
-                return ImageFont.truetype(font_path, size)
-            # Если Symbola нет - пробуем NotoColorEmoji
-            font_path = os.path.join(font_dir, "NotoColorEmoji.ttf")
-            if os.path.exists(font_path):
-                print(f"✅ Загружен шрифт NotoColorEmoji.ttf для эмодзи")
-                return ImageFont.truetype(font_path, size)
-            # Если ничего нет - используем обычный
-            print(f"⚠️ Шрифт с эмодзи не найден, использую обычный")
-            return load_font(size, "regular")
-        
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
         font_file = font_files.get(style, "regular.ttf")
         font_path = os.path.join(font_dir, font_file)
@@ -254,9 +238,9 @@ def create_hero_card(hero):
         start_y = 80
         
         if is_legendary:
-            content_height = 150 + 25 + 60 + 48 + 30 + 35
+            content_height = 150 + 25 + 80 + 48 + 30 + 35
         else:
-            content_height = 60 + 48 + 30 + 35
+            content_height = 80 + 48 + 30 + 35
         
         content_start = (height - p - 10 - content_height) // 2 + 10
         current_y = content_start
@@ -290,23 +274,28 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
+        # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
             kindness = hero.get('kindness', random.randint(30, 99))
             
-            # ЗАГРУЖАЕМ ШРИФТ С ЭМОДЗИ (Symbola.ttf)
-            font_stats = load_font(44, "emoji")
+            font_stats = load_font(38, "bold")
             
-            # ЭМОДЗИ: 💪 Сила, 🧠 Интеллект, ❤️ Доброта
-            stats_text = f"💪{strength}  🧠{intelligence}  ❤️{kindness}"
+            # РАЗДЕЛЯЕМ НА 3 КОЛОНКИ
+            third = width // 3
+            col1_x = third // 2
+            col2_x = third + third // 2
+            col3_x = third * 2 + third // 2
             
-            # Поднимаем характеристики выше
-            center_y = current_y - 30
+            stats_y = current_y - 20
             
-            draw.text((width//2, center_y), stats_text, fill=(0, 0, 0), font=font_stats, anchor="mt")
+            # ЧЁРНО-БЕЛЫЕ СИМВОЛЫ (ГАРАНТИРОВАННО ОТОБРАЖАЮТСЯ)
+            draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+            draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+            draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
             
-            current_y = center_y + 65
+            current_y = stats_y + 70
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
