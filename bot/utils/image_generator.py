@@ -207,21 +207,44 @@ def create_hero_card(hero):
         font_title = load_font(18, "bold")
         draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
-        # --- ОСНОВНОЙ КОНТЕНТ ---
-        start_y = 80
+        # --- ХАРАКТЕРИСТИКИ (ТОЛЬКО ДЛЯ НЕЛЕГЕНДАРНЫХ, У ВЕРХНЕЙ РАМКИ) ---
+        stats_y = p + 10
+        current_y = stats_y + 70
         
-        if is_legendary:
-            content_height = 150 + 25 + 80 + 48 + 30 + 35
-        else:
-            content_height = 80 + 48 + 30 + 35
-        
-        content_start = (height - p - 10 - content_height) // 2 + 10
-        current_y = content_start
+        if not is_legendary:
+            strength = hero.get('strength', random.randint(30, 99))
+            intelligence = hero.get('intelligence', random.randint(30, 99))
+            kindness = hero.get('kindness', random.randint(30, 99))
+            
+            font_stats = load_font(38, "bold")
+            
+            third = width // 3
+            col1_x = third // 2
+            col2_x = third + third // 2
+            col3_x = third * 2 + third // 2
+            
+            draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+            draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+            draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+            
+            current_y = stats_y + 70
 
-        # --- ПОРТРЕТ (только для легендарных) ---
+        # --- ОСНОВНОЙ БЛОК (ИМЯ, КНИГА, АВТОР) - ПО ЦЕНТРУ ВЕРТИКАЛЬНО ---
+        # Вычисляем высоту блока
+        if is_legendary:
+            # Для легендарных - портрет + имя + книга + автор
+            block_height = 150 + 25 + 48 + 30 + 35
+        else:
+            # Для нелегендарных - только имя + книга + автор
+            block_height = 48 + 30 + 35
+        
+        # Центрируем блок
+        block_start = (height - p - 10 - block_height) // 2 + 10
+        
+        # Если есть портрет, вставляем его перед блоком
         if is_legendary:
             portrait_size = 150
-            portrait_y = current_y
+            portrait_y = block_start
             
             portrait = load_portrait(hero)
             if portrait:
@@ -242,33 +265,13 @@ def create_hero_card(hero):
                               (x + portrait_size + 2, portrait_y + portrait_size + 2)], 
                              outline=pal["accent"], width=1)
                 
-                current_y += portrait_size + 25
+                current_y = portrait_y + portrait_size + 25
             else:
-                current_y += 150 + 25
+                current_y = block_start + 150 + 25
+        else:
+            current_y = block_start
 
-        # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
-        # ОСТАВЛЯЕМ ТАМ ГДЕ БЫЛИ (ПОДНЯТЫ К РАМКЕ)
-        if not is_legendary:
-            strength = hero.get('strength', random.randint(30, 99))
-            intelligence = hero.get('intelligence', random.randint(30, 99))
-            kindness = hero.get('kindness', random.randint(30, 99))
-            
-            font_stats = load_font(38, "bold")
-            
-            third = width // 3
-            col1_x = third // 2
-            col2_x = third + third // 2
-            col3_x = third * 2 + third // 2
-            
-            stats_y = p + 10
-            
-            draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-            
-            current_y = stats_y + 70
-
-        # --- ИМЯ ГЕРОЯ ---
+        # --- ИМЯ ГЕРОЯ (ПО ЦЕНТРУ) ---
         y = current_y
         name = hero.get("name", "Неизвестный герой")
         font_name = load_font(38, "bold")
@@ -277,7 +280,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
         current_y += 48
 
-        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ (В ЦЕНТР) ---
+        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ (ПО ЦЕНТРУ) ---
         y = current_y
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
         if len(book) > 28:
@@ -287,7 +290,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_book, anchor="mt")
         current_y += 30
 
-        # --- АВТОР (В ЦЕНТР) ---
+        # --- АВТОР (ПО ЦЕНТРУ) ---
         y = current_y
         author = hero.get("author", "Неизвестный автор")
         font_author = load_font(17, "regular")
