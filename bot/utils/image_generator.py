@@ -11,26 +11,6 @@ def load_font(size, style="regular"):
     """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
-        
-        # Если запрошен шрифт с эмодзи
-        if style == "emoji":
-            # Пробуем загрузить NotoColorEmoji
-            font_path = os.path.join(font_dir, "NotoColorEmoji.ttf")
-            if os.path.exists(font_path):
-                try:
-                    return ImageFont.truetype(font_path, size)
-                except:
-                    pass
-            # Если нет - пробуем другие шрифты с эмодзи
-            for f in os.listdir(font_dir):
-                if 'emoji' in f.lower() or 'symbol' in f.lower() or 'Noto' in f:
-                    try:
-                        return ImageFont.truetype(os.path.join(font_dir, f), size)
-                    except:
-                        pass
-            # Если ничего не нашли - используем обычный шрифт
-            return load_font(size, "regular")
-        
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
         font_file = font_files.get(style, "regular.ttf")
         font_path = os.path.join(font_dir, font_file)
@@ -238,14 +218,14 @@ def create_hero_card(hero):
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- НОМЕР КАРТЫ (В ПРАВЫЙ ВЕРХНИЙ УГОЛ) ---
-        font_number = load_font(22, "bold")
+        # --- НОМЕР КАРТЫ (ЗА РАМКОЙ, В ПРАВЫЙ ВЕРХНИЙ УГОЛ) ---
+        font_number = load_font(16, "bold")
         number_text = f"№ {card_number:03d}"
-        draw.text((width - 8, 8), number_text, fill=pal["border"], font=font_number, anchor="rt")
+        draw.text((width - 5, 5), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS ---
-        font_title = load_font(18, "italic")
-        draw.text((width//2, 8), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
+        # --- LITRA PACKS (ЗА РАМКОЙ, В ЛЕВЫЙ ВЕРХНИЙ УГОЛ) ---
+        font_title = load_font(14, "italic")
+        draw.text((5, 8), "Litra Packs", fill=pal["accent"], font=font_title, anchor="lt")
 
         # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
         corner_size = 18
@@ -294,25 +274,23 @@ def create_hero_card(hero):
                 current_y += 150 + 25
 
         # --- ХАРАКТЕРИСТИКИ (только для нелегендарных) ---
+        # МЕЧИ, МОЗГ И СЕРДЦЕ
         if not is_legendary:
             strength = hero.get('strength', random.randint(30, 99))
             intelligence = hero.get('intelligence', random.randint(30, 99))
             kindness = hero.get('kindness', random.randint(30, 99))
             
-            # Загружаем шрифт с эмодзи
-            font_stats = load_font(44, "emoji")
+            font_stats = load_font(42, "bold")
             
-            # ЭМОДЗИ: 💪 (сила), 🧠 (интеллект), ❤️ (доброта)
-            stats_text = f"💪{strength}  🧠{intelligence}  ❤️{kindness}"
+            # Символы: ⚔ - меч, 🧠 - мозг, ❤ - сердце
+            stats_text = f"⚔ {strength}  🧠 {intelligence}  ❤ {kindness}"
             
-            # Вычисляем центр между верхней рамкой и именем
-            top_y = p + 20
-            bottom_y = current_y + 48
-            center_y = (top_y + bottom_y) // 2
+            # Поднимаем чуть выше
+            center_y = current_y - 10
             
             draw.text((width//2, center_y), stats_text, fill=(0, 0, 0), font=font_stats, anchor="mt")
             
-            current_y = center_y + 50
+            current_y = center_y + 55
 
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
