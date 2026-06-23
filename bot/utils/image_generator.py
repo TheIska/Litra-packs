@@ -1,3 +1,5 @@
+# bot/utils/image_generator.py
+
 import io
 import os
 import random
@@ -141,50 +143,60 @@ def draw_stars(draw, x, y, count, color):
         print(f"❌ Ошибка в draw_stars: {e}")
 
 
-def draw_corner_ornament(draw, x, y, pal, size=20, direction="tl"):
+def draw_corner_ornament(draw, x, y, pal, size=15, direction="tl"):
     """Рисует угловой орнамент в нужном направлении"""
-    # Определяем углы для дуги
-    if direction == "tl":  # верхний левый
+    if direction == "tl":
         start_angle, end_angle = 0, 90
-    elif direction == "tr":  # верхний правый
+    elif direction == "tr":
         start_angle, end_angle = 90, 180
-    elif direction == "bl":  # нижний левый
+    elif direction == "bl":
         start_angle, end_angle = 270, 360
-    else:  # нижний правый
+    else:
         start_angle, end_angle = 180, 270
     
-    # Дуги
     for i in range(3, 0, -1):
-        s = size - (3 - i) * 5
-        draw.arc([x - s, y - s, x + s, y + s], start_angle, end_angle, 
-                 fill=pal["border_light"], width=1)
+        s = size - (3 - i) * 4
+        if s > 4:
+            draw.arc([x - s, y - s, x + s, y + s], start_angle, end_angle, 
+                     fill=pal["border_light"], width=1)
     
-    # Точки в углу
-    draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=pal["accent"])
+    draw.ellipse([x - 1.5, y - 1.5, x + 1.5, y + 1.5], fill=pal["accent"])
 
 
 def draw_border_dots(draw, width, height, pal, margin=18):
-    """Рисует декоративные точки между рамкой и краем карты"""
-    dot_spacing = 20
-    dot_size = 2
+    """Рисует маленькие декоративные точки между рамкой и краем карты"""
+    dot_spacing = 15
+    dot_size = 1.5
     
-    # Верхняя и нижняя стороны
-    for x in range(margin + 30, width - margin - 30, dot_spacing):
-        # Верх
-        draw.ellipse([x - dot_size, margin - 8, x + dot_size, margin - 4], 
-                     fill=pal["border_light"])
-        # Низ
-        draw.ellipse([x - dot_size, height - margin - 4, x + dot_size, height - margin], 
+    # Верхняя сторона (только до угловых орнаментов)
+    for x in range(margin + 35, width - margin - 35, dot_spacing):
+        draw.ellipse([x - dot_size, margin - 6, x + dot_size, margin - 3], 
                      fill=pal["border_light"])
     
-    # Левая и правая стороны
-    for y in range(margin + 30, height - margin - 30, dot_spacing):
-        # Лево
-        draw.ellipse([margin - 8, y - dot_size, margin - 4, y + dot_size], 
+    # Нижняя сторона
+    for x in range(margin + 35, width - margin - 35, dot_spacing):
+        draw.ellipse([x - dot_size, height - margin - 3, x + dot_size, height - margin], 
                      fill=pal["border_light"])
-        # Право
-        draw.ellipse([width - margin - 4, y - dot_size, width - margin, y + dot_size], 
+    
+    # Левая сторона
+    for y in range(margin + 35, height - margin - 35, dot_spacing):
+        draw.ellipse([margin - 6, y - dot_size, margin - 3, y + dot_size], 
                      fill=pal["border_light"])
+    
+    # Правая сторона
+    for y in range(margin + 35, height - margin - 35, dot_spacing):
+        draw.ellipse([width - margin - 3, y - dot_size, width - margin, y + dot_size], 
+                     fill=pal["border_light"])
+
+
+def draw_decorative_line(draw, x1, y1, x2, y2, pal):
+    """Рисует декоративную линию с точками"""
+    draw.line([(x1, y1), (x2, y2)], fill=pal["border_light"], width=1)
+    
+    # Точки на линии
+    step = 20
+    for x in range(x1 + 10, x2 - 10, step):
+        draw.ellipse([x - 1.5, y1 - 1.5, x + 1.5, y1 + 1.5], fill=pal["accent"])
 
 
 def create_hero_card(hero):
@@ -238,35 +250,31 @@ def create_hero_card(hero):
         img = create_vintage_texture(width, height)
         draw = ImageDraw.Draw(img)
 
-        # --- ОДНА РАМКА (как было) ---
+        # --- РАМКА ---
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
         # --- ТОЧКИ МЕЖДУ РАМКОЙ И КРАЕМ ---
         draw_border_dots(draw, width, height, pal, p)
 
-        # --- НОМЕР КАРТЫ (в правом верхнем углу) ---
+        # --- НОМЕР КАРТЫ ---
         font_number = load_font(16, "bold")
         number_text = f"№ {card_number:03d}"
         draw.text((width - 30, 22), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS НАД РАМКОЙ ---
-        font_title = load_font(18, "italic")
-        draw.text((width//2, 8), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
+        # --- LITRA PACKS ПРЯМ НАД РАМКОЙ ---
+        font_title = load_font(16, "italic")
+        draw.text((width//2, p - 12), "Litra Packs", fill=pal["accent"], font=font_title, anchor="mt")
 
-        # --- УГЛОВЫЕ ОРНАМЕНТЫ (правильные направления) ---
-        corner_size = 22
-        # Верхний левый
-        draw_corner_ornament(draw, p + 10, p + 10, pal, corner_size, "tl")
-        # Верхний правый
-        draw_corner_ornament(draw, width - p - 10, p + 10, pal, corner_size, "tr")
-        # Нижний левый
-        draw_corner_ornament(draw, p + 10, height - p - 10, pal, corner_size, "bl")
-        # Нижний правый
-        draw_corner_ornament(draw, width - p - 10, height - p - 10, pal, corner_size, "br")
+        # --- УГЛОВЫЕ ОРНАМЕНТЫ ---
+        corner_size = 18
+        draw_corner_ornament(draw, p + 8, p + 8, pal, corner_size, "tl")
+        draw_corner_ornament(draw, width - p - 8, p + 8, pal, corner_size, "tr")
+        draw_corner_ornament(draw, p + 8, height - p - 8, pal, corner_size, "bl")
+        draw_corner_ornament(draw, width - p - 8, height - p - 8, pal, corner_size, "br")
 
-        # --- ОСНОВНОЙ КОНТЕНТ (по центру) ---
-        start_y = 75
+        # --- ОСНОВНОЙ КОНТЕНТ ---
+        start_y = 80
         
         if is_legendary:
             content_height = 150 + 25 + 48 + 30 + 35
@@ -276,7 +284,7 @@ def create_hero_card(hero):
         content_start = (height - p - 10 - content_height) // 2 + 10
         current_y = content_start
 
-        # --- ПОРТРЕТ (только для легендарных) ---
+        # --- ПОРТРЕТ ---
         if is_legendary:
             portrait_size = 150
             portrait_y = current_y
@@ -304,6 +312,10 @@ def create_hero_card(hero):
             else:
                 current_y += 150 + 25
 
+        # --- ДЕКОРАТИВНАЯ ЛИНИЯ ПЕРЕД ИМЕНЕМ ---
+        line_y = current_y - 8
+        draw_decorative_line(draw, 60, line_y, width - 60, line_y, pal)
+
         # --- ИМЯ ГЕРОЯ ---
         y = current_y
         name = hero.get("name", "Неизвестный герой")
@@ -330,9 +342,12 @@ def create_hero_card(hero):
         draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
         current_y += 35
 
-        # --- РЕДКОСТЬ (над нижней рамкой) ---
-        rarity_y = height - p - 10 - 30 - 25
-        
+        # --- ДЕКОРАТИВНАЯ ЛИНИЯ ПЕРЕД РЕДКОСТЬЮ ---
+        rarity_y = height - p - 10 - 30 - 30
+        line_y = rarity_y - 12
+        draw_decorative_line(draw, 80, line_y, width - 80, line_y, pal)
+
+        # --- РЕДКОСТЬ ---
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
             "эпический": "ЭПИЧЕСКИЙ",
