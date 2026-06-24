@@ -9,8 +9,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import (
     get_collection, get_user, update_duel_stats, get_all_users, add_coins,
-    get_friends, add_friend, is_friend, get_user_by_id
+    get_user_by_id
 )
+from ..friends import get_friends, add_friend, is_friend
 from ..models.questions import QUESTIONS
 from ..utils.helpers import shuffle_question, extract_work
 
@@ -42,7 +43,6 @@ def generate_invite_code(user_id: int) -> str:
 
 
 def get_bot_name():
-    """Возвращает имя бота для ссылок"""
     return "LiteraPacksBot"
 
 
@@ -124,18 +124,16 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("👥 Мои друзья", callback_data="duel_friends")],
-        [InlineKeyboardButton("➕ Добавить друга", callback_data="duel_add_friend")],
-        [InlineKeyboardButton("🔗 Пригласить друга по ссылке", callback_data="duel_invite")],
+        [InlineKeyboardButton("👥 С друзьями", callback_data="duel_friends")],
         [InlineKeyboardButton("🤖 С ботом", callback_data="duel_bot")],
+        [InlineKeyboardButton("🔗 Пригласить по ссылке", callback_data="duel_invite")],
         [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
     ]
     text = (
         "⚔️ *Выбери тип дуэли*\n\n"
-        "👥 *Мои друзья* — выбери друга из списка\n"
-        "➕ *Добавить друга* — добавь друга по ID\n"
-        "🔗 *Пригласить друга по ссылке* — получи ссылку для друга\n"
-        "🤖 *С ботом* — сражайся против ИИ\n\n"
+        "👥 *С друзьями* — выбери друга из списка\n"
+        "🤖 *С ботом* — сражайся против ИИ\n"
+        "🔗 *Пригласить по ссылке* — получи ссылку для друга\n\n"
         "Для дуэли нужно *3 героя* в коллекции."
     )
     
@@ -146,7 +144,7 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duel_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает список друзей"""
+    """Показывает список друзей для дуэли"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -155,10 +153,9 @@ async def duel_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
     friends = get_friends(user_id)
     
     if not friends:
-        text = "😴 У вас пока нет друзей.\n\nИспользуйте «➕ Добавить друга» или «🔗 Пригласить друга по ссылке»."
+        text = "😴 У вас пока нет друзей.\n\nДобавьте друзей через меню «Друзья» или пригласите по ссылке."
         keyboard = [
-            [InlineKeyboardButton("➕ Добавить друга", callback_data="duel_add_friend")],
-            [InlineKeyboardButton("🔗 Пригласить по ссылке", callback_data="duel_invite")],
+            [InlineKeyboardButton("👥 Добавить друзей", callback_data="friends_menu")],
             [InlineKeyboardButton("🔙 Назад", callback_data="duel")],
         ]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -173,85 +170,74 @@ async def duel_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = f"ID: {fid}"
         
         hero_count = len(get_collection(fid))
+        status = "🟢" if fid not in user_duel else "🔴"
         keyboard.append([
             InlineKeyboardButton(
-                f"👤 {name} ({hero_count} героев)", 
+                f"{status} {name} ({hero_count} героев)", 
                 callback_data=f"duel_friend_select|{fid}"
             )
         ])
     
-    keyboard.append([InlineKeyboardButton("➕ Добавить друга", callback_data="duel_add_friend")])
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="duel")])
     
     await query.edit_message_text(
-        "👥 *Выбери друга для дуэли:*",
+        "👥 *Выбери друга для дуэли:*\n\n🟢 — доступен\n🔴 — в дуэли",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
-async def duel_add_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавление друга по ID"""
+async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправка запроса другу"""
     query = update.callback_query
     await query.answer()
-    chat_id = query.message.chat_id
-    
-    text = (
-        "➕ *Добавить друга*\n\n"
-        "Введите ID друга в чат.\n"
-        "ID можно узнать, отправив команду /id в личные сообщения боту.\n\n"
-        "Например: `123456789`"
-    )
-    keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="duel")]]
-    
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
+    user_id = query.from_user.id
+    friend_id = int(query.data.split("|")[1])
+
+    if friend_id in user_duel:
+        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
+        return
+
+    if len(get_collection(friend_id)) < 3:
+        await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("✅ Принять дуэль", callback_data=f"duel_accept|{user_id}")],
+        [InlineKeyboardButton("❌ Отказаться", callback_data="duel_decline")],
+    ]
+    await context.bot.send_message(
+        friend_id, 
+        f"⚔️ *{update.effective_user.first_name} хочет вызвать тебя на дуэль!*\n\n"
+        f"Для дуэли нужно 3 героя в коллекции.",
+        parse_mode="Markdown", 
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    context.user_data['waiting_for_friend_id'] = True
+    await query.edit_message_text("⏳ Отправлен запрос сопернику. Ожидай ответа...")
 
 
-async def handle_add_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает добавление друга по ID"""
-    if not context.user_data.get('waiting_for_friend_id'):
+async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Принятие дуэли"""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    opponent_id = int(query.data.split("|")[1])
+
+    if opponent_id in user_duel:
+        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
         return
-    
-    user_id = update.effective_user.id
-    try:
-        friend_id = int(update.message.text.strip())
-        
-        if friend_id == user_id:
-            await update.message.reply_text("❌ Нельзя добавить самого себя!")
-            context.user_data['waiting_for_friend_id'] = False
-            return
-        
-        user = get_user_by_id(friend_id)
-        if not user:
-            await update.message.reply_text("❌ Пользователь с таким ID не найден!")
-            context.user_data['waiting_for_friend_id'] = False
-            return
-        
-        if is_friend(user_id, friend_id):
-            await update.message.reply_text("✅ Этот пользователь уже в вашем списке друзей!")
-            context.user_data['waiting_for_friend_id'] = False
-            return
-        
-        if add_friend(user_id, friend_id):
-            try:
-                chat = await context.bot.get_chat(friend_id)
-                name = chat.first_name or "Пользователь"
-            except:
-                name = f"ID {friend_id}"
-            
-            await update.message.reply_text(f"✅ *{name}* добавлен в список друзей!", parse_mode="Markdown")
-            context.user_data['waiting_for_friend_id'] = False
-            await duel_command(update, context)
-        else:
-            await update.message.reply_text("❌ Ошибка при добавлении друга. Попробуйте позже.")
-            
-    except ValueError:
-        await update.message.reply_text("❌ Некорректный ID. Введите число.")
+
+    if len(get_collection(user_id)) < 3 or len(get_collection(opponent_id)) < 3:
+        await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
+        return
+
+    await proceed_to_hero_selection(update, context, user_id, query.message.chat_id, opponent_id, False)
+
+
+async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("❌ Ты отказался от дуэли.")
 
 
 async def duel_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -326,59 +312,6 @@ async def handle_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     invite_codes.pop(code, None)
     await proceed_to_hero_selection(update, context, user_id, update.effective_chat.id, inviter_id, True)
-
-
-async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправка запроса другу"""
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    friend_id = int(query.data.split("|")[1])
-
-    if friend_id in user_duel:
-        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
-        return
-
-    if len(get_collection(friend_id)) < 3:
-        await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
-        return
-
-    keyboard = [
-        [InlineKeyboardButton("✅ Принять дуэль", callback_data=f"duel_accept|{user_id}")],
-        [InlineKeyboardButton("❌ Отказаться", callback_data="duel_decline")],
-    ]
-    await context.bot.send_message(
-        friend_id, 
-        f"⚔️ *{update.effective_user.first_name} хочет вызвать тебя на дуэль!*\n\n"
-        f"Для дуэли нужно 3 героя в коллекции.",
-        parse_mode="Markdown", 
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    await query.edit_message_text("⏳ Отправлен запрос сопернику. Ожидай ответа...")
-
-
-async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Принятие дуэли от друга"""
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    opponent_id = int(query.data.split("|")[1])
-
-    if opponent_id in user_duel:
-        await query.edit_message_text("❌ Этот игрок уже в дуэли.")
-        return
-
-    if len(get_collection(user_id)) < 3 or len(get_collection(opponent_id)) < 3:
-        await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
-        return
-
-    await proceed_to_hero_selection(update, context, user_id, query.message.chat_id, opponent_id, False)
-
-
-async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("❌ Ты отказался от дуэли.")
 
 
 async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):

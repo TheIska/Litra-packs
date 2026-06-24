@@ -1,3 +1,5 @@
+# bot/main.py
+
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
@@ -8,7 +10,18 @@ from .handlers.start import (
     show_coins, 
     shop, 
     report_error, 
-    forward_to_admin
+    forward_to_admin,
+    friends_menu,
+    friends_add_id,
+    friends_invite,
+    copy_invite,
+    share_invite,
+    handle_friend_invite,
+    friends_from_list,
+    friends_add_from_list,
+    friends_add_username,
+    handle_add_friend,
+    handle_add_by_username
 )
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.album import (
@@ -24,8 +37,6 @@ from .handlers.duel import (
     handle_hero_selection,
     handle_invite_link,
     duel_friends,
-    duel_add_friend,
-    handle_add_friend,
     duel_friend_select,
     duel_bot,
     duel_accept,
@@ -53,6 +64,7 @@ def main():
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("start", handle_invite_link))
+    app.add_handler(CommandHandler("start", handle_friend_invite))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("duel", duel_command))
     app.add_handler(CommandHandler("stopduel", stop_duel_command))
@@ -80,10 +92,19 @@ def main():
     app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
     app.add_handler(CallbackQueryHandler(show_album, pattern="^album$"))
 
+    # ========== ДРУЗЬЯ ==========
+    app.add_handler(CallbackQueryHandler(friends_menu, pattern="^friends_menu$"))
+    app.add_handler(CallbackQueryHandler(friends_add_id, pattern="^friends_add_id$"))
+    app.add_handler(CallbackQueryHandler(friends_invite, pattern="^friends_invite$"))
+    app.add_handler(CallbackQueryHandler(copy_invite, pattern="^copy_invite\|"))
+    app.add_handler(CallbackQueryHandler(share_invite, pattern="^share_invite\|"))
+    app.add_handler(CallbackQueryHandler(friends_from_list, pattern="^friends_from_list$"))
+    app.add_handler(CallbackQueryHandler(friends_add_from_list, pattern="^friends_add_from_list\|"))
+    app.add_handler(CallbackQueryHandler(friends_add_username, pattern="^friends_add_username$"))
+
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
     app.add_handler(CallbackQueryHandler(duel_friends, pattern="^duel_friends$"))
-    app.add_handler(CallbackQueryHandler(duel_add_friend, pattern="^duel_add_friend$"))
     app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\|"))
     app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
     app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
@@ -106,8 +127,9 @@ def main():
     # ========== ВИКТОРИНА ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
 
-    # ========== ДОБАВЛЕНИЕ ДРУГА ==========
+    # ========== ВВОД ДЛЯ ДРУЗЕЙ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_friend))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_by_username))
 
     # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
