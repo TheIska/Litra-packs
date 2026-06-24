@@ -1,9 +1,7 @@
-# bot/handlers/album.py
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from ..database import get_collection, get_card_by_number
-from ..models.hero import HEROES_BY_NUMBER, get_total_heroes, get_hero_by_number
+from ..database import get_collection
+from ..models.hero import HEROES_BY_NUMBER, get_total_heroes
 from ..utils.image_generator import create_hero_card
 import logging
 import traceback
@@ -30,9 +28,11 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         total_heroes = get_total_heroes()
         total_pages = (total_heroes - 1) // CARDS_PER_PAGE + 1
         
+        # Получаем коллекцию пользователя
         collection = get_collection(user_id)
         print(f"📊 Коллекция пользователя {user_id}: {len(collection)} карт")
         
+        # Собираем номера выбитых карт
         collected_numbers = set()
         for hero in collection.values():
             number = hero.get('card_number', 0)
@@ -41,6 +41,7 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         print(f"📊 Всего выбито: {len(collected_numbers)}/{total_heroes}")
         
+        # Получаем всех героев для текущей страницы
         start_idx = page * CARDS_PER_PAGE
         end_idx = min(start_idx + CARDS_PER_PAGE, total_heroes)
         sorted_heroes = sorted(HEROES_BY_NUMBER.items())
@@ -72,6 +73,7 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 callback_data = f"album_card_{number}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
+        # Кнопки навигации
         nav_buttons = []
         if page > 0:
             nav_buttons.append(InlineKeyboardButton("◀️ Назад", callback_data="album_prev"))
@@ -80,6 +82,7 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         if nav_buttons:
             keyboard.append(nav_buttons)
         
+        # Быстрые переходы по номерам
         number_buttons = []
         for i in range(1, 10):
             num = i * 25
@@ -91,16 +94,44 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        # ПРОВЕРКА: если сообщение содержит фото, отправляем новое вместо редактирования
         if query and query.message:
             try:
-                await query.edit_message_text(
-                    text,
+                # Проверяем, есть ли в сообщении текст
+                if query.message.text:
+                    await query.edit_message_text(
+                        text,
+                        reply_markup=reply_markup,
+                        parse_mode="Markdown"
+                    )
+                    print("✅ Альбом обновлён (редактирование)")
+                else:
+                    # Если сообщение содержит фото, удаляем и отправляем новое
+                    try:
+                        await query.message.delete()
+                    except:
+                        pass
+                    await context.bot.send_message(
+                        chat_id=query.message.chat_id,
+                        text=text,
+                        reply_markup=reply_markup,
+                        parse_mode="Markdown"
+                    )
+                    print("✅ Альбом отправлен новым сообщением (было фото)")
+            except Exception as e:
+                print(f"❌ Ошибка при редактировании: {e}")
+                # Если ошибка - отправляем новое сообщение
+                try:
+                    await query.message.delete()
+                except:
+                    pass
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text=text,
                     reply_markup=reply_markup,
                     parse_mode="Markdown"
                 )
-                print("✅ Альбом обновлён")
-            except Exception as e:
-                print(f"❌ Ошибка при редактировании: {e}")
+                print("✅ Альбом отправлен новым сообщением (после ошибки)")
         else:
             await update.message.reply_text(
                 text,
@@ -166,8 +197,21 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         number = int(query.data.split("_")[2])
         print(f"🔍 Номер карты: {number}")
         
-        card = get_card_by_number(user_id, number)
-        hero_info = get_hero_by_number(number)
+        # Получаем коллекцию пользователя
+        collection = get_collection(user_id)
+        
+        # Проверяем, есть ли карта в коллекции
+        card = None
+        for hero in collection.values():
+            if hero.get('card_number', 0) == number:
+                card = hero
+                break
+        
+        hero_info = None
+        for num, hero in HEROES_BY_NUMBER.items():
+            if num == number:
+                hero_info = hero
+                break
         
         print(f"📊 card из БД: {card is not None}")
         print(f"📊 hero_info: {hero_info.get('name') if hero_info else None}")
