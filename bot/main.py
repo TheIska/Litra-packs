@@ -25,8 +25,9 @@ from .handlers.duel import (
     stop_duel_command,
     handle_hero_selection,
     handle_invite_link,
-    duel_random,
-    duel_friend,
+    duel_friends,
+    duel_add_friend,
+    handle_add_friend,
     duel_friend_select,
     duel_bot,
     duel_accept,
@@ -76,7 +77,6 @@ def main():
     app.add_handler(CallbackQueryHandler(large_pack, pattern="^large_pack$"))
 
     # ========== АЛЬБОМ ==========
-    # ВАЖНО: сначала более конкретные обработчики!
     app.add_handler(CallbackQueryHandler(show_card_by_number, pattern="^album_card_"))
     app.add_handler(CallbackQueryHandler(album_back, pattern="^album_back$"))
     app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
@@ -84,8 +84,8 @@ def main():
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
-    app.add_handler(CallbackQueryHandler(duel_random, pattern="^duel_random$"))
-    app.add_handler(CallbackQueryHandler(duel_friend, pattern="^duel_friend$"))
+    app.add_handler(CallbackQueryHandler(duel_friends, pattern="^duel_friends$"))
+    app.add_handler(CallbackQueryHandler(duel_add_friend, pattern="^duel_add_friend$"))
     app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\|"))
     app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
     app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
@@ -107,6 +107,9 @@ def main():
 
     # ========== ВИКТОРИНА ==========
     app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
+
+    # ========== ДОБАВЛЕНИЕ ДРУГА ==========
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_friend))
 
     # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
