@@ -89,17 +89,6 @@ def get_save_chance(heroes, collection):
     return sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in heroes)
 
 
-async def show_menu(update, context, user_id, chat_id, text, keyboard):
-    try:
-        if update.callback_query:
-            await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
-        else:
-            await context.bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=keyboard)
-    except Exception as e:
-        if "Message is not modified" not in str(e):
-            print(f"⚠️ Ошибка: {e}")
-
-
 async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
@@ -219,8 +208,8 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
-    opponent_id = int(query.data.split("|")[1])
+    user_id = query.from_user.id  # Тот, кто ПРИНИМАЕТ дуэль
+    opponent_id = int(query.data.split("|")[1])  # Тот, кто ПРИГЛАСИЛ
 
     if opponent_id in user_duel:
         await query.edit_message_text("❌ Этот игрок уже в дуэли.")
@@ -241,8 +230,11 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     # ПОКАЗЫВАЕМ ВЫБОР ГЕРОЕВ ОБОИМ ИГРОКАМ
+    # Для принимающего - в текущем чате
     await show_hero_selection_for_duel(update, context, user_id, query.message.chat_id, "friend")
-    await show_hero_selection_for_duel(update, context, opponent_id, query.message.chat_id, "friend")
+    
+    # Для пригласившего - в его личный чат
+    await show_hero_selection_for_duel(update, context, opponent_id, opponent_id, "friend")
 
     await query.edit_message_text("⚔️ *Дуэль принята! Выбирайте героев...*", parse_mode="Markdown")
 
@@ -614,7 +606,6 @@ async def start_duel_after_selection(update, context, user_id):
         return
 
     if opponent_id:
-        # Проверяем, выбрал ли соперник героев
         opponent_data = user_selection.get(opponent_id, {})
         opponent_selected = opponent_data.get("selected", [])
         
@@ -720,6 +711,8 @@ async def ask_question(update, context, duel_id):
         return
 
     q = duel["questions"][duel["turn"]]
+    
+    # СБРАСЫВАЕМ ФЛАГИ ДЛЯ НОВОГО ВОПРОСА
     duel["question_active"] = True
     duel["correct_answered"] = False
     duel["p1_answered"] = False
