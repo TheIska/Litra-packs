@@ -625,7 +625,6 @@ async def start_duel_after_selection(update, context, user_id):
             )
             return
         
-        # УБИРАЕМ лишнюю проверку и сразу начинаем дуэль
         await start_duel(update, context, user_id, opponent_id, selected, opponent_selected)
         return
 
@@ -722,7 +721,8 @@ async def ask_question(update, context, duel_id):
 
     q = duel["questions"][duel["turn"]]
     duel["question_active"] = True
-    duel["correct_answered"] = False    duel["p1_answered"] = False
+    duel["correct_answered"] = False
+    duel["p1_answered"] = False
     duel["p2_answered"] = False
     duel["waiting_for_answer"] = True
 
