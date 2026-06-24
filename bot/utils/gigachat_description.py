@@ -1,7 +1,6 @@
 import os
 import json
-import aiohttp
-import asyncio
+import requests
 from typing import Optional
 from datetime import datetime, timedelta
 
@@ -17,7 +16,7 @@ _token_cache = {
 }
 
 
-async def get_access_token() -> Optional[str]:
+def get_access_token() -> Optional[str]:
     """Получает access token для GigaChat"""
     global _token_cache
     
@@ -44,28 +43,26 @@ async def get_access_token() -> Optional[str]:
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, data=data, ssl=False) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    _token_cache["access_token"] = result.get("access_token")
-                    _token_cache["expires_at"] = datetime.now() + timedelta(seconds=result.get("expires_at", 1800))
-                    return _token_cache["access_token"]
-                else:
-                    print(f"❌ Ошибка получения токена GigaChat: {response.status}")
-                    return None
+        response = requests.post(url, headers=headers, data=data, verify=False)
+        if response.status_code == 200:
+            result = response.json()
+            _token_cache["access_token"] = result.get("access_token")
+            _token_cache["expires_at"] = datetime.now() + timedelta(seconds=result.get("expires_at", 1800))
+            return _token_cache["access_token"]
+        else:
+            print(f"❌ Ошибка получения токена GigaChat: {response.status_code}")
+            return None
     except Exception as e:
         print(f"❌ Ошибка GigaChat auth: {e}")
         return None
 
 
-async def get_hero_description_gigachat(hero_name: str, author: str, book: str) -> Optional[str]:
+def get_hero_description_gigachat_sync(hero_name: str, author: str, book: str) -> Optional[str]:
     """
     Генерирует описание литературного героя через GigaChat
     """
     try:
-        # Получаем токен
-        token = await get_access_token()
+        token = get_access_token()
         if not token:
             return None
         
@@ -105,50 +102,23 @@ async def get_hero_description_gigachat(hero_name: str, author: str, book: str) 
             "stream": False
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload, ssl=False) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result.get("choices") and len(result["choices"]) > 0:
-                        description = result["choices"][0]["message"]["content"].strip()
-                        return description
-                    else:
-                        print(f"❌ GigaChat: нет ответа")
-                        return None
-                else:
-                    error_text = await response.text()
-                    print(f"❌ Ошибка GigaChat: {response.status}")
-                    return None
+        response = requests.post(url, headers=headers, json=payload, verify=False)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("choices") and len(result["choices"]) > 0:
+                description = result["choices"][0]["message"]["content"].strip()
+                return description
+            else:
+                print(f"❌ GigaChat: нет ответа")
+                return None
+        else:
+            print(f"❌ Ошибка GigaChat: {response.status_code}")
+            return None
                     
     except Exception as e:
         print(f"❌ Ошибка GigaChat API: {e}")
         return None
-
-
-# Функция-заглушка для получения описания (работает без GigaChat)
-def get_fallback_description(hero_name: str, author: str, book: str) -> str:
-    """Возвращает заглушку для описания, если GigaChat недоступен"""
-    descriptions = {
-        "Евгений Онегин": "Главный герой романа А.С. Пушкина. Молодой дворянин, разочарованный в светской жизни.",
-        "Татьяна Ларина": "Идеал русской женщины в романе Пушкина. Чистая, искренняя, верная своим чувствам.",
-        "Григорий Печорин": "Герой романа М.Ю. Лермонтова. Сложная личность, ищущая смысл жизни.",
-        "Анна Каренина": "Героиня романа Л.Н. Толстого. Женщина, которая пожертвовала всем ради любви.",
-        "Раскольников": "Герой романа Ф.М. Достоевского. Молодой человек, одержимый идеей сверхчеловека.",
-        "Базаров": "Герой романа И.С. Тургенева. Нигилист, отрицающий все устои общества.",
-        "Чичиков": "Герой поэмы Н.В. Гоголя. Предприимчивый авантюрист, скупающий мертвые души.",
-    }
-    
-    # Ищем точное совпадение
-    if hero_name in descriptions:
-        return descriptions[hero_name]
-    
-    # Ищем частичное совпадение
-    for key, value in descriptions.items():
-        if key in hero_name or hero_name in key:
-            return value
-    
-    # Если не нашли - возвращаем стандартное описание
-    return f"{hero_name} — литературный герой произведения «{book}» автора {author}. Персонаж, который оставил след в истории русской литературы."
 
 
 async def get_hero_description_cached(hero_name: str, author: str, book: str) -> str:
@@ -157,7 +127,6 @@ async def get_hero_description_cached(hero_name: str, author: str, book: str) ->
     """
     from ..database import get_connection
     
-    # Проверяем кеш
     conn = get_connection()
     c = conn.cursor()
     
@@ -181,12 +150,12 @@ async def get_hero_description_cached(hero_name: str, author: str, book: str) ->
         conn.close()
         return row[0]
     
-    # Нет в кеше - пытаемся через GigaChat
-    description = await get_hero_description_gigachat(hero_name, author, book)
+    # Нет в кеше - генерируем через GigaChat
+    description = get_hero_description_gigachat_sync(hero_name, author, book)
     
-    # Если GigaChat не ответил - используем заглушку
+    # Если GigaChat не ответил - сохраняем сообщение об ошибке
     if not description:
-        description = get_fallback_description(hero_name, author, book)
+        description = f"⚠️ Описание для {hero_name} временно недоступно. Попробуйте позже."
     
     # Сохраняем в кеш
     c.execute(

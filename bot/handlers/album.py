@@ -214,7 +214,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Генерируем описание через GigaChat
         await context.bot.send_message(
             chat_id=chat_id,
-            text="⏳ Генерирую описание героя..."
+            text="⏳ Генерирую описание героя через ИИ..."
         )
         
         description = await generate_description_for_hero(hero_info)
@@ -223,8 +223,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             try:
                 print(f"🎴 Генерируем карточку для {hero_info['name']}")
                 
-                # Создаем карточку (без описания на карте)
-                image_bytes = await create_hero_card(hero_info)
+                image_bytes = create_hero_card(hero_info)
                 
                 if hasattr(image_bytes, 'getvalue'):
                     image_data = image_bytes.getvalue()
@@ -233,7 +232,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
                     image_data = image_bytes
                     print(f"✅ Карточка создана")
                 
-                # Капшн с описанием под картинкой
                 caption = (
                     f"✅ **{hero_info['name']}**\n"
                     f"🆔 № {number:03d}\n"
@@ -268,7 +266,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             keyboard = [[InlineKeyboardButton("🔙 Назад в альбом", callback_data="album_back")]]
             
-            # Показываем информацию без карточки (герой не выпал)
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"❌ **{hero_info['name']}**\n"
