@@ -7,7 +7,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 
 def load_font(size, style="regular"):
-    """Загружает шрифт из папки static/fonts"""
     try:
         font_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'fonts')
         font_files = {"regular": "regular.ttf", "italic": "italic.ttf", "bold": "bold.ttf"}
@@ -26,12 +25,10 @@ def load_font(size, style="regular"):
 
 
 def load_portrait(hero):
-    """Загружает портрет для легендарного героя (5 писателей)"""
     try:
         if hero.get("rarity") != "легендарный":
             return None
         
-        # 5 писателей: Пушкин, Лермонтов, Гоголь, Тургенев, Достоевский
         portrait_map = {
             "Пушкин": "pushkin.png",
             "Лермонтов": "lermontov.png",
@@ -43,39 +40,20 @@ def load_portrait(hero):
         hero_name = hero.get("name", "")
         author = hero.get("author", "")
         
-        filename = None
-        
-        # Ищем по имени героя
         for key, value in portrait_map.items():
-            if key in hero_name or hero_name in key:
-                filename = value
-                break
-        
-        # Если не нашли - ищем по автору
-        if not filename:
-            for key, value in portrait_map.items():
-                if key in author or author in key:
-                    filename = value
-                    break
-        
-        if not filename:
-            return None
-        
-        portrait_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'portraits', filename)
-        if os.path.exists(portrait_path):
-            try:
-                return Image.open(portrait_path).convert("RGBA")
-            except Exception as e:
-                print(f"❌ Ошибка загрузки портрета: {e}")
-                return None
+            if key in hero_name or hero_name in key or key in author or author in key:
+                portrait_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'portraits', value)
+                if os.path.exists(portrait_path):
+                    try:
+                        return Image.open(portrait_path).convert("RGBA")
+                    except:
+                        return None
         return None
-    except Exception as e:
-        print(f"❌ Ошибка в load_portrait: {e}")
+    except:
         return None
 
 
 def get_years(author):
-    """Годы жизни для 5 писателей"""
     years = {
         "Пушкин": "1799–1837",
         "Лермонтов": "1814–1841",
@@ -89,46 +67,7 @@ def get_years(author):
     return ""
 
 
-def get_random_quote(author):
-    """Цитаты для 5 писателей"""
-    quotes = {
-        "Пушкин": [
-            "Я жить хочу, чтоб мыслить и страдать.",
-            "Гений и злодейство — две вещи несовместные.",
-            "Привычка свыше нам дана, замена счастию она.",
-            "Мой друг, отчизне посвятим души прекрасные порывы!"
-        ],
-        "Лермонтов": [
-            "Поверь мне — счастье только там, где любят нас, где верят нам!",
-            "Из двух друзей всегда один раб другого.",
-            "Герой не тот, кто победил, а тот, кто не сдался."
-        ],
-        "Гоголь": [
-            "Какой же русский не любит быстрой езды?",
-            "Нет слова, которое было бы так замашисто, как метко сказанное русское слово.",
-            "В каждом слове бездна пространства."
-        ],
-        "Тургенев": [
-            "Во дни сомнений, во дни тягостных раздумий о судьбах моей родины, — ты один мне поддержка, о русский язык!",
-            "Любовь сильнее смерти и страха смерти.",
-            "Счастье — как здоровье: когда его не замечаешь, значит, оно есть."
-        ],
-        "Достоевский": [
-            "Человек есть тайна. Ее надо разгадывать всю жизнь.",
-            "Если Бога нет, то всё позволено.",
-            "Красота спасет мир.",
-            "Без страданий нельзя понять счастья."
-        ]
-    }
-    
-    for key, value in quotes.items():
-        if key in author:
-            return random.choice(value)
-    return "С любовью к литературе"
-
-
 def create_vintage_texture(width, height):
-    """Создаёт текстуру старой бумаги"""
     try:
         img = Image.new('RGB', (width, height), (245, 240, 230))
         draw = ImageDraw.Draw(img)
@@ -149,13 +88,11 @@ def create_vintage_texture(width, height):
                     pixels[x, y] = (r, g, b)
         
         return img
-    except Exception as e:
-        print(f"❌ Ошибка в create_vintage_texture: {e}")
+    except:
         return Image.new('RGB', (width, height), (245, 240, 230))
 
 
 def draw_stars(draw, x, y, count, color):
-    """Рисует звёздочки для редкости"""
     try:
         for i in range(count):
             star_x = x - (count - 1) * 14 + i * 28
@@ -165,50 +102,49 @@ def draw_stars(draw, x, y, count, color):
                 dy = int(8 * math.sin(rad))
                 draw.point((star_x + dx, y + dy), fill=color)
             draw.point((star_x, y), fill=color)
-    except Exception as e:
-        print(f"❌ Ошибка в draw_stars: {e}")
+    except:
+        pass
+
+
+def get_center_text_position(draw, text, font, center_x, center_y):
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    x = center_x - text_width // 2
+    y = center_y - text_height // 2
+    return x, y
 
 
 def create_hero_card(hero):
-    """Создаёт карточку героя с номером"""
     try:
         print(f"🖼️ create_hero_card вызвана для: {hero.get('name', 'Unknown')}")
         
         width, height = 500, 700
         rarity = hero.get("rarity", "обычный")
         is_legendary = (rarity == "легендарный")
-        
         card_number = hero.get('card_number', random.randint(1, 225))
 
         colors = {
             "легендарный": {
-                "bg": (240, 232, 215),
                 "border": (180, 130, 70),
-                "border_light": (200, 170, 120),
                 "accent": (200, 150, 70),
                 "text": (60, 40, 25),
                 "sub": (100, 75, 50)
             },
             "эпический": {
-                "bg": (235, 228, 220),
                 "border": (140, 105, 155),
-                "border_light": (175, 150, 185),
                 "accent": (160, 120, 170),
                 "text": (55, 40, 65),
                 "sub": (95, 75, 105)
             },
             "редкий": {
-                "bg": (230, 230, 225),
                 "border": (85, 130, 165),
-                "border_light": (140, 175, 200),
                 "accent": (95, 145, 175),
                 "text": (40, 50, 65),
                 "sub": (75, 95, 115)
             },
             "обычный": {
-                "bg": (225, 222, 215),
                 "border": (130, 120, 110),
-                "border_light": (175, 165, 155),
                 "accent": (155, 145, 135),
                 "text": (55, 50, 45),
                 "sub": (95, 85, 75)
@@ -224,91 +160,95 @@ def create_hero_card(hero):
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- НОМЕР КАРТЫ ---
+        # --- НОМЕР КАРТЫ (правый верхний) ---
         font_number = load_font(16, "bold")
-        number_text = f"№ {card_number:03d}"
-        draw.text((width - 5, 5), number_text, fill=pal["border"], font=font_number, anchor="rt")
+        draw.text((width - 10, 10), f"№ {card_number:03d}", fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS ---
-        font_title = load_font(18, "bold")
-        draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
+        # --- LITRA PACKS (левый верхний) ---
+        font_title = load_font(14, "bold")
+        draw.text((10, 10), "✦ Litra Packs", fill=pal["accent"], font=font_title, anchor="lt")
 
-        # --- ХАРАКТЕРИСТИКИ ---
-        stats_y = p + 10
-        
+        # --- СТАТЫ (НАВЕРХУ) ---
+        stats_y = 55
         strength = hero.get('strength', random.randint(30, 99))
         intelligence = hero.get('intelligence', random.randint(30, 99))
         kindness = hero.get('kindness', random.randint(30, 99))
         
-        font_stats = load_font(38, "bold")
-        
+        font_stats = load_font(32, "bold")
         third = width // 3
-        col1_x = third // 2
-        col2_x = third + third // 2
-        col3_x = third * 2 + third // 2
         
-        draw.text((col1_x, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-        draw.text((col2_x, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-        draw.text((col3_x, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
-        
-        current_y = stats_y + 70
+        draw.text((third // 2, stats_y), f"⚔ {strength}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+        draw.text((third + third // 2, stats_y), f"🧠 {intelligence}", fill=(0, 0, 0), font=font_stats, anchor="mt")
+        draw.text((third * 2 + third // 2, stats_y), f"❤ {kindness}", fill=(0, 0, 0), font=font_stats, anchor="mt")
 
-        # --- ПОРТРЕТ (только для легендарных) ---
+        # --- ПОРТРЕТ (для легендарных) ---
         if is_legendary:
-            portrait_size = 200
-            portrait_margin = 8
-            
+            portrait_size = 160
             portrait = load_portrait(hero)
+            
             if portrait:
                 portrait = portrait.resize((portrait_size, portrait_size), Image.Resampling.LANCZOS)
-                
                 mask = Image.new('L', (portrait_size, portrait_size), 0)
                 mask_draw = ImageDraw.Draw(mask)
                 mask_draw.ellipse((2, 2, portrait_size - 2, portrait_size - 2), fill=255)
                 portrait.putalpha(mask)
                 
-                x = (width - portrait_size) // 2
-                img.paste(portrait, (x, current_y), portrait)
+                portrait_x = (width - portrait_size) // 2
+                portrait_y = 110
+                img.paste(portrait, (portrait_x, portrait_y), portrait)
                 
-                draw.ellipse([(x - portrait_margin, current_y - portrait_margin), 
-                              (x + portrait_size + portrait_margin, current_y + portrait_size + portrait_margin)], 
-                             outline=pal["border"], width=3)
-                draw.ellipse([(x - portrait_margin // 2, current_y - portrait_margin // 2), 
-                              (x + portrait_size + portrait_margin // 2, current_y + portrait_size + portrait_margin // 2)], 
-                             outline=pal["accent"], width=1)
-                
-                current_y = current_y + portrait_size + portrait_margin * 2 + 25
+                draw.ellipse([(portrait_x - 5, portrait_y - 5), 
+                              (portrait_x + portrait_size + 5, portrait_y + portrait_size + 5)], 
+                             outline=pal["border"], width=2)
+                center_y = portrait_y + portrait_size + 50
             else:
-                current_y += 80
+                center_y = 160
+        else:
+            center_y = 150
+
+        # --- ОСНОВНОЙ БЛОК (ИМЯ, КНИГА, АВТОР - ПО ЦЕНТРУ ВЕРТИКАЛИ И ГОРИЗОНТАЛИ) ---
+        center_x = width // 2
 
         # --- ИМЯ ГЕРОЯ ---
-        y = current_y
         name = hero.get("name", "Неизвестный герой")
-        font_name = load_font(38, "bold")
+        font_name = load_font(36, "bold")
+        name_x, name_y = get_center_text_position(draw, name, font_name, center_x, center_y)
         
-        draw.text((width//2 + 1, y + 1), name, fill=(0, 0, 0, 20), font=font_name, anchor="mt")
-        draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
-        current_y += 48
+        draw.text((name_x + 2, name_y + 2), name, fill=(0, 0, 0, 20), font=font_name)
+        draw.text((name_x, name_y), name, fill=pal["text"], font=font_name)
+        
+        bbox = draw.textbbox((0, 0), name, font=font_name)
+        name_height = bbox[3] - bbox[1]
+        current_y = name_y + name_height + 12
 
         # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ ---
-        y = current_y
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
-        if len(book) > 28:
-            book = book[:25] + "..."
+        if len(book) > 30:
+            book = book[:27] + "..."
         
         font_book = load_font(20, "italic")
-        draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_book, anchor="mt")
-        current_y += 30
+        book_x, book_y = get_center_text_position(draw, f'«{book}»', font_book, center_x, current_y)
+        draw.text((book_x, book_y), f'«{book}»', fill=pal["sub"], font=font_book)
+        
+        bbox = draw.textbbox((0, 0), f'«{book}»', font=font_book)
+        book_height = bbox[3] - bbox[1]
+        current_y = book_y + book_height + 10
 
         # --- АВТОР ---
-        y = current_y
         author = hero.get("author", "Неизвестный автор")
-        font_author = load_font(17, "regular")
-        draw.text((width//2, y), f'— {author} —', fill=pal["sub"], font=font_author, anchor="mt")
-        current_y += 35
+        font_author = load_font(18, "regular")
+        
+        years = get_years(author)
+        author_text = f'— {author}'
+        if years:
+            author_text += f' ({years})'
+        author_text += ' —'
+        
+        author_x, author_y = get_center_text_position(draw, author_text, font_author, center_x, current_y)
+        draw.text((author_x, author_y), author_text, fill=pal["sub"], font=font_author)
 
-        # --- РЕДКОСТЬ ---
-        rarity_y = height - p - 10 - 30
+        # --- РЕДКОСТЬ (внизу) ---
+        rarity_y = height - 45
         
         labels = {
             "легендарный": "ЛЕГЕНДАРНЫЙ",
@@ -317,7 +257,7 @@ def create_hero_card(hero):
             "обычный": "ОБЫЧНЫЙ"
         }
         rarity_text = labels.get(rarity, "ОБЫЧНЫЙ")
-        font_rare = load_font(22, "bold")
+        font_rare = load_font(20, "bold")
         
         colors_rare = {
             "легендарный": (200, 160, 80),
@@ -330,16 +270,13 @@ def create_hero_card(hero):
         stars_count = {"легендарный": 5, "эпический": 4, "редкий": 3, "обычный": 2}
         stars = stars_count.get(rarity, 2)
         
-        star_y = rarity_y - 5
-        draw_stars(draw, width//2, star_y, stars, color)
-        
+        draw_stars(draw, width//2, rarity_y - 8, stars, color)
         draw.text((width//2 + 1, rarity_y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
         draw.text((width//2, rarity_y), rarity_text, fill=color, font=font_rare, anchor="mt")
         
         # --- УЛУЧШЕНИЕ КАЧЕСТВА ---
         enhancer = ImageEnhance.Sharpness(img)
         img = enhancer.enhance(1.5)
-        
         enhancer = ImageEnhance.Contrast(img)
         img = enhancer.enhance(1.05)
 
