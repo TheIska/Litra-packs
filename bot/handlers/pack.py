@@ -112,17 +112,21 @@ async def open_pack(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_typ
     if pack_type != "free":
         caption += f"\n💰 Осталось: *{user['coins'] - PACK_PRICES[pack_type]}* монет."
 
+    # КНОПКИ - ИСПРАВЛЕНО!
     keyboard = [
         [InlineKeyboardButton("📚 Альбом", callback_data="album")],
         [InlineKeyboardButton("🎁 Открыть другой пак", callback_data="shop")],
+        [InlineKeyboardButton("🏠 В меню", callback_data="main_menu")],
     ]
 
     if query:
         try:
+            # Удаляем старое сообщение
             await query.message.delete()
         except Exception:
             pass
         
+        # Отправляем новое сообщение с фото и кнопками
         await context.bot.send_photo(
             chat_id=chat_id,
             photo=image_bytes,

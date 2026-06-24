@@ -4,6 +4,7 @@ from ..database import get_user, update_user, add_coins
 from ..models.questions import QUESTIONS
 import random
 import datetime
+import asyncio  # ДОБАВЛЕН ИМПОРТ
 
 # Хранилище активных викторин
 active_quizzes = {}
@@ -16,7 +17,10 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Запускает викторину"""
     query = update.callback_query
     if query:
-        await query.answer()
+        try:
+            await query.answer()
+        except:
+            pass
         user_id = query.from_user.id
         chat_id = query.message.chat_id
         message_id = query.message.message_id
@@ -27,16 +31,15 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Проверяем, есть ли уже активная викторина
     if user_id in active_quizzes:
+        text = "⏳ У тебя уже есть активная викторина! Отвечай на вопросы."
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
         if query:
-            await query.edit_message_text(
-                "⏳ У тебя уже есть активная викторина! Отвечай на вопросы.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
-            )
+            try:
+                await query.edit_message_text(text, reply_markup=keyboard)
+            except:
+                await context.bot.send_message(chat_id, text, reply_markup=keyboard)
         else:
-            await update.message.reply_text(
-                "⏳ У тебя уже есть активная викторина! Отвечай на вопросы.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
-            )
+            await update.message.reply_text(text, reply_markup=keyboard)
         return
 
     # Проверяем ежедневный бонус
@@ -47,32 +50,30 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Сбрасываем daily_quiz_done, если прошёл день
     if last_date and last_date != today:
         update_user(user_id, daily_quiz_done=0, daily_quiz_streak=0)
-        user = get_user(user_id)  # Обновляем данные
+        user = get_user(user_id)
     
     # Проверяем, получал ли уже бонус сегодня
     if user.get("daily_quiz_done", 0) >= 5:
+        text = (
+            "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
+            f"💰 Твой баланс: {user['coins']} монет\n\n"
+            "Завтра в 00:00 бонусы обновятся! 🎉"
+        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
         if query:
-            await query.edit_message_text(
-                "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
-                f"💰 Твой баланс: {user['coins']} монет\n\n"
-                "Завтра в 00:00 бонусы обновятся! 🎉",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
-            )
+            try:
+                await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            except:
+                await context.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="Markdown")
         else:
-            await update.message.reply_text(
-                "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
-                f"💰 Твой баланс: {user['coins']} монет\n\n"
-                "Завтра в 00:00 бонусы обновятся! 🎉",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
-            )
+            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
         return
 
     # Проверяем, сколько бонусов уже получено сегодня
     bonus_count = user.get("daily_quiz_done", 0)
-    remaining = 5 - bonus_count
 
     # Перемешиваем вопросы
-    questions = random.sample(QUIZ_QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUIZ_QUESTIONS)))
+    questions = random.sample(QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUESTIONS)))
     
     # Сохраняем состояние викторины
     quiz_data = {
@@ -86,7 +87,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "message_id": message_id
     }
     active_quizzes[user_id] = quiz_data
-    quiz_answers[user_id] = 0  # Счётчик правильных ответов за викторину
+    quiz_answers[user_id] = 0
 
     # Отправляем первый вопрос
     await send_question(update, context, user_id, chat_id)
@@ -129,26 +130,33 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user
 
     try:
         if update.callback_query:
-            await update.callback_query.edit_message_text(
-                text_message,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-        else:
-            await context.bot.send_message(
-                chat_id,
-                text_message,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-    except Exception as e:
-        print(f"❌ Ошибка отправки вопроса: {e}")
+            try:
+                await update.callback_query.edit_message_text(
+                    text_message,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="Markdown"
+                )
+                return
+            except Exception as e:
+                if "Message is not modified" in str(e):
+                    return
         await context.bot.send_message(
             chat_id,
             text_message,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
+    except Exception as e:
+        print(f"❌ Ошибка отправки вопроса: {e}")
+        try:
+            await context.bot.send_message(
+                chat_id,
+                text_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except:
+            pass
 
 
 async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -160,20 +168,31 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     
     try:
+        await query.answer()
+    except:
+        pass
+    
+    try:
         _, user_id_str, answer_idx = data.split("_")
         user_id = int(user_id_str)
         answer_idx = int(answer_idx)
     except ValueError:
-        await query.answer("❌ Ошибка! Попробуйте снова.")
+        try:
+            await query.edit_message_text("❌ Ошибка! Попробуйте снова.")
+        except:
+            pass
         return
 
     # Проверяем, что викторина активна
     quiz = active_quizzes.get(user_id)
     if not quiz:
-        await query.edit_message_text(
-            "❌ Викторина завершена или неактивна.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
-        )
+        try:
+            await query.edit_message_text(
+                "❌ Викторина завершена или неактивна.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+            )
+        except:
+            pass
         return
 
     # Проверяем, что ответ правильный
@@ -191,11 +210,14 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Проверяем, не исчерпан ли лимит бонусов
     if user.get("daily_quiz_done", 0) >= 5:
-        await query.edit_message_text(
-            "✅ Ты уже получил все бонусы за сегодня!\n"
-            "Завтра в 00:00 бонусы обновятся. 🎉",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
-        )
+        try:
+            await query.edit_message_text(
+                "✅ Ты уже получил все бонусы за сегодня!\n"
+                "Завтра в 00:00 бонусы обновятся. 🎉",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+            )
+        except:
+            pass
         del active_quizzes[user_id]
         return
 
@@ -215,19 +237,25 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         quiz["bonus_count"] = new_done
         
         # Сообщаем о начислении
-        await query.edit_message_text(
-            f"✅ *Правильно!* +50 монет! 💰\n\n"
-            f"📊 Получено бонусов сегодня: {new_done}/5\n"
-            f"💰 Твой баланс: {user['coins'] + 50} монет",
-            parse_mode="Markdown"
-        )
+        try:
+            await query.edit_message_text(
+                f"✅ *Правильно!* +50 монет! 💰\n\n"
+                f"📊 Получено бонусов сегодня: {new_done}/5\n"
+                f"💰 Твой баланс: {user['coins'] + 50} монет",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
         await asyncio.sleep(1)
     else:
-        await query.edit_message_text(
-            f"❌ *Неправильно.*\n\n"
-            f"Правильный ответ: {quiz['questions'][quiz['current']]['options'][correct]}",
-            parse_mode="Markdown"
-        )
+        try:
+            await query.edit_message_text(
+                f"❌ *Неправильно.*\n\n"
+                f"Правильный ответ: {quiz['questions'][quiz['current']]['options'][correct]}",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
         await asyncio.sleep(1.5)
 
     # Переходим к следующему вопросу
@@ -248,9 +276,8 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
         return
     
     user = get_user(user_id)
-    today = datetime.datetime.now().date().isoformat()
     
-    keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
     
     # Проверяем, все ли бонусы получены
     done = user.get("daily_quiz_done", 0)
@@ -273,12 +300,26 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
             "Чтобы получить их, начни новую викторину!"
         )
     
-    await context.bot.send_message(
-        chat_id=quiz.get("chat_id", user_id),
-        text=text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    try:
+        if update.callback_query and update.callback_query.message:
+            await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        else:
+            await context.bot.send_message(
+                chat_id=quiz.get("chat_id", user_id),
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+    except:
+        try:
+            await context.bot.send_message(
+                chat_id=quiz.get("chat_id", user_id),
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except:
+            pass
 
 
 async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -286,6 +327,10 @@ async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     
     if query:
+        try:
+            await query.answer()
+        except:
+            pass
         user_id = query.from_user.id
         chat_id = query.message.chat_id
     else:
@@ -297,15 +342,22 @@ async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         quiz_answers.pop(user_id, None)
         
         text = "⏹️ *Викторина завершена!*"
-        keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
         
-        if query:
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-        else:
-            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        try:
+            if query:
+                await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        except:
+            await context.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="Markdown")
     else:
         text = "❌ У тебя нет активной викторины."
-        if query:
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]))
-        else:
-            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]))
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        try:
+            if query:
+                await query.edit_message_text(text, reply_markup=keyboard)
+            else:
+                await update.message.reply_text(text, reply_markup=keyboard)
+        except:
+            await context.bot.send_message(chat_id, text, reply_markup=keyboard)
