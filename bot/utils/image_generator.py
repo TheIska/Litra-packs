@@ -1,11 +1,10 @@
-# bot/utils/image_generator.py
-
 import io
 import os
 import random
 import math
 import traceback
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+
 
 def load_font(size, style="regular"):
     """Загружает шрифт из папки static/fonts"""
@@ -27,20 +26,38 @@ def load_font(size, style="regular"):
 
 
 def load_portrait(hero):
-    """Загружает портрет для легендарного героя"""
+    """Загружает портрет для легендарного героя (только 5 писателей)"""
     try:
         if hero.get("rarity") != "легендарный":
             return None
         
+        # Только 5 писателей
         portrait_map = {
-            "Александр Пушкин": "pushkin.png",
-            "Михаил Лермонтов": "lermontov.png",
-            "Николай Гоголь": "gogol.png",
-            "Фёдор Достоевский": "dostoevsky.png",
-            "Иван Тургенев": "turgenev.png",
+            "Пушкин": "pushkin.png",
+            "Лермонтов": "lermontov.png",
+            "Гоголь": "gogol.png",
+            "Тургенев": "turgenev.png",
+            "Некрасов": "nekrasov.png",
         }
         
-        filename = portrait_map.get(hero.get("name", ""))
+        hero_name = hero.get("name", "")
+        author = hero.get("author", "")
+        
+        filename = None
+        
+        # Ищем по имени героя
+        for key, value in portrait_map.items():
+            if key in hero_name or hero_name in key:
+                filename = value
+                break
+        
+        # Если не нашли - ищем по автору
+        if not filename:
+            for key, value in portrait_map.items():
+                if key in author or author in key:
+                    filename = value
+                    break
+        
         if not filename:
             return None
         
@@ -58,47 +75,55 @@ def load_portrait(hero):
 
 
 def get_years(author):
+    """Годы жизни для 5 писателей"""
     years = {
-        "А.С. Пушкин": "1799–1837",
-        "М.Ю. Лермонтов": "1814–1841",
-        "Н.В. Гоголь": "1809–1852",
-        "Ф.М. Достоевский": "1821–1881",
-        "И.С. Тургенев": "1818–1883",
+        "Пушкин": "1799–1837",
+        "Лермонтов": "1814–1841",
+        "Гоголь": "1809–1852",
+        "Тургенев": "1818–1883",
+        "Некрасов": "1821–1877",
     }
-    return years.get(author, "")
+    for key, value in years.items():
+        if key in author:
+            return value
+    return ""
 
 
 def get_random_quote(author):
+    """Цитаты для 5 писателей"""
     quotes = {
-        "А.С. Пушкин": [
+        "Пушкин": [
             "Я жить хочу, чтоб мыслить и страдать.",
             "Гений и злодейство — две вещи несовместные.",
             "Привычка свыше нам дана, замена счастию она.",
             "Мой друг, отчизне посвятим души прекрасные порывы!"
         ],
-        "М.Ю. Лермонтов": [
+        "Лермонтов": [
             "Поверь мне — счастье только там, где любят нас, где верят нам!",
             "Из двух друзей всегда один раб другого.",
             "Герой не тот, кто победил, а тот, кто не сдался."
         ],
-        "Н.В. Гоголь": [
+        "Гоголь": [
             "Какой же русский не любит быстрой езды?",
             "Нет слова, которое было бы так замашисто, как метко сказанное русское слово.",
             "В каждом слове бездна пространства."
         ],
-        "Ф.М. Достоевский": [
-            "Человек есть тайна. Ее надо разгадывать всю жизнь.",
-            "Если Бога нет, то всё позволено.",
-            "Красота спасет мир."
-        ],
-        "И.С. Тургенев": [
+        "Тургенев": [
             "Во дни сомнений, во дни тягостных раздумий о судьбах моей родины, — ты один мне поддержка, о русский язык!",
             "Любовь сильнее смерти и страха смерти.",
             "Счастье — как здоровье: когда его не замечаешь, значит, оно есть."
+        ],
+        "Некрасов": [
+            "Поэтом можешь ты не быть, но гражданином быть обязан.",
+            "Сеятель знанья на ниву народную!",
+            "Ты и убогая, ты и обильная, ты и могучая, ты и бессильная, матушка Русь!"
         ]
     }
-    author_quotes = quotes.get(author, ["С любовью к литературе"])
-    return random.choice(author_quotes)
+    
+    for key, value in quotes.items():
+        if key in author:
+            return random.choice(value)
+    return "С любовью к литературе"
 
 
 def create_vintage_texture(width, height):
@@ -198,16 +223,16 @@ def create_hero_card(hero):
         p = 18
         draw.rectangle([(p, p), (width - p, height - p)], outline=pal["border"], width=2)
 
-        # --- НОМЕР КАРТЫ (ЗА РАМКОЙ, В ПРАВЫЙ ВЕРХНИЙ УГОЛ) ---
+        # --- НОМЕР КАРТЫ ---
         font_number = load_font(16, "bold")
         number_text = f"№ {card_number:03d}"
         draw.text((width - 5, 5), number_text, fill=pal["border"], font=font_number, anchor="rt")
 
-        # --- LITRA PACKS (МАКСИМАЛЬНО ВВЕРХУ) ---
+        # --- LITRA PACKS ---
         font_title = load_font(18, "bold")
         draw.text((width//2, 2), "✦ Litra Packs ✦", fill=pal["accent"], font=font_title, anchor="mt")
 
-        # --- ХАРАКТЕРИСТИКИ (ДЛЯ ВСЕХ ГЕРОЕВ, У ВЕРХНЕЙ РАМКИ) ---
+        # --- ХАРАКТЕРИСТИКИ ---
         stats_y = p + 10
         
         strength = hero.get('strength', random.randint(30, 99))
@@ -227,24 +252,10 @@ def create_hero_card(hero):
         
         current_y = stats_y + 70
 
-        # --- ОСНОВНОЙ БЛОК (ПОРТРЕТ, ИМЯ, КНИГА, АВТОР) - ПО ЦЕНТРУ ВЕРТИКАЛЬНО ---
-        # Для легендарных - увеличиваем портрет и рамку
+        # --- ПОРТРЕТ (только для легендарных) ---
         if is_legendary:
-            portrait_size = 200  # УВЕЛИЧЕННЫЙ ПОРТРЕТ
-            portrait_margin = 8   # УВЕЛИЧЕННАЯ РАМКА
-            block_height = portrait_size + portrait_margin * 2 + 25 + 48 + 30 + 35
-        else:
-            portrait_size = 0
-            portrait_margin = 0
-            block_height = 48 + 30 + 35
-        
-        # Центрируем блок
-        block_start = (height - p - 10 - block_height) // 2 + 10
-        current_y = block_start
-        
-        # --- ПОРТРЕТ (только для легендарных, УВЕЛИЧЕННЫЙ) ---
-        if is_legendary:
-            portrait_y = current_y
+            portrait_size = 200
+            portrait_margin = 8
             
             portrait = load_portrait(hero)
             if portrait:
@@ -256,21 +267,20 @@ def create_hero_card(hero):
                 portrait.putalpha(mask)
                 
                 x = (width - portrait_size) // 2
-                img.paste(portrait, (x, portrait_y), portrait)
+                img.paste(portrait, (x, current_y), portrait)
                 
-                # УВЕЛИЧЕННАЯ РАМКА ВОКРУГ ПОРТРЕТА
-                draw.ellipse([(x - portrait_margin, portrait_y - portrait_margin), 
-                              (x + portrait_size + portrait_margin, portrait_y + portrait_size + portrait_margin)], 
+                draw.ellipse([(x - portrait_margin, current_y - portrait_margin), 
+                              (x + portrait_size + portrait_margin, current_y + portrait_size + portrait_margin)], 
                              outline=pal["border"], width=3)
-                draw.ellipse([(x - portrait_margin // 2, portrait_y - portrait_margin // 2), 
-                              (x + portrait_size + portrait_margin // 2, portrait_y + portrait_size + portrait_margin // 2)], 
+                draw.ellipse([(x - portrait_margin // 2, current_y - portrait_margin // 2), 
+                              (x + portrait_size + portrait_margin // 2, current_y + portrait_size + portrait_margin // 2)], 
                              outline=pal["accent"], width=1)
                 
-                current_y = portrait_y + portrait_size + portrait_margin * 2 + 25
+                current_y = current_y + portrait_size + portrait_margin * 2 + 25
             else:
-                current_y += portrait_size + portrait_margin * 2 + 25
+                current_y += 80
 
-        # --- ИМЯ ГЕРОЯ (ПО ЦЕНТРУ) ---
+        # --- ИМЯ ГЕРОЯ ---
         y = current_y
         name = hero.get("name", "Неизвестный герой")
         font_name = load_font(38, "bold")
@@ -279,7 +289,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), name, fill=pal["text"], font=font_name, anchor="mt")
         current_y += 48
 
-        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ (ПО ЦЕНТРУ) ---
+        # --- НАЗВАНИЕ ПРОИЗВЕДЕНИЯ ---
         y = current_y
         book = hero.get("book", hero.get("work", "Неизвестное произведение"))
         if len(book) > 28:
@@ -289,7 +299,7 @@ def create_hero_card(hero):
         draw.text((width//2, y), f'«{book}»', fill=pal["sub"], font=font_book, anchor="mt")
         current_y += 30
 
-        # --- АВТОР (ПО ЦЕНТРУ) ---
+        # --- АВТОР ---
         y = current_y
         author = hero.get("author", "Неизвестный автор")
         font_author = load_font(17, "regular")
@@ -325,6 +335,7 @@ def create_hero_card(hero):
         draw.text((width//2 + 1, rarity_y + 1), rarity_text, fill=(0, 0, 0, 15), font=font_rare, anchor="mt")
         draw.text((width//2, rarity_y), rarity_text, fill=color, font=font_rare, anchor="mt")
         
+        # --- УЛУЧШЕНИЕ КАЧЕСТВА ---
         enhancer = ImageEnhance.Sharpness(img)
         img = enhancer.enhance(1.5)
         
@@ -341,6 +352,7 @@ def create_hero_card(hero):
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в create_hero_card: {e}")
         traceback.print_exc()
+        # Создаем карточку с ошибкой
         img = Image.new('RGB', (500, 700), (255, 200, 200))
         draw = ImageDraw.Draw(img)
         draw.text((250, 350), "Ошибка создания карточки", fill=(0, 0, 0), anchor="mt")
