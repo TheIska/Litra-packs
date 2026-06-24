@@ -1,5 +1,3 @@
-# bot/main.py
-
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
@@ -34,15 +32,11 @@ from .handlers.duel import (
     answer_callback,
     stop_duel_command,
     handle_hero_selection,
-    handle_invite_link,
     duel_friends,
     duel_friend_select,
     duel_bot,
     duel_accept,
     duel_decline,
-    duel_invite,
-    copy_link,
-    share_link,
 )
 from .handlers.admin import add_coins_command
 from .handlers.quiz import quiz_command, quiz_answer_callback, stop_quiz_command
@@ -62,7 +56,6 @@ def main():
 
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("start", handle_invite_link))
     app.add_handler(CommandHandler("start", handle_friend_invite))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("id", id_command))
@@ -108,13 +101,10 @@ def main():
     app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
     app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
     app.add_handler(CallbackQueryHandler(duel_decline, pattern="^duel_decline$"))
-    app.add_handler(CallbackQueryHandler(duel_invite, pattern="^duel_invite$"))
-    app.add_handler(CallbackQueryHandler(copy_link, pattern="^copy_link\|"))
-    app.add_handler(CallbackQueryHandler(share_link, pattern="^share_link\|"))
     
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\|"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^s\|"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^f\|"))
     
     # ========== ВЫБОР ГЕРОЕВ ==========
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hsel\|"))
