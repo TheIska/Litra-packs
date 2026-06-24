@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, update_user, add_coins
-from ..models.questions import QUIZ_QUESTIONS
+from ..models.questions import QUESTIONS
 import random
 import datetime
 
