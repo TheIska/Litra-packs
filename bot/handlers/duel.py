@@ -599,7 +599,6 @@ async def start_bot_duel(update, context, user_id, p1_chosen):
 
 
 async def ask_question_bot(update, context, duel_id):
-    """Вопрос для дуэли с ботом"""
     duel = duels.get(duel_id)
     if not duel or duel["status"] != "active":
         return
@@ -628,7 +627,6 @@ async def ask_question_bot(update, context, duel_id):
 
 
 async def ask_question_friend(update, context, duel_id):
-    """Вопрос для дуэли с другом - кто первый ответит"""
     duel = duels.get(duel_id)
     if not duel or duel["status"] != "active":
         return
@@ -643,6 +641,8 @@ async def ask_question_friend(update, context, duel_id):
     duel["waiting_for_answer"] = True
     duel["p1_answered"] = False
     duel["p2_answered"] = False
+    duel["p1_score_increment"] = False
+    duel["p2_score_increment"] = False
 
     work = q.get("work", extract_work(q.get("text", "")))
     work_text = f"\n📖 *{work}*" if work else ""
@@ -702,7 +702,6 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_bot_answer(update, context, duel_id, player_id, answer_idx):
-    """Обработка ответа в дуэли с ботом"""
     duel = duels.get(duel_id)
     if not duel:
         return
@@ -773,6 +772,7 @@ async def handle_friend_answer(update, context, duel_id, player_id, answer_idx):
     
     is_p1 = player_id == duel["player1"]
     player_key = "p1" if is_p1 else "p2"
+    other_key = "p2" if is_p1 else "p1"
     
     if duel.get(f"{player_key}_answered"):
         await update.callback_query.edit_message_text("⏳ Ты уже отвечал на этот вопрос!")
@@ -785,9 +785,38 @@ async def handle_friend_answer(update, context, duel_id, player_id, answer_idx):
     
     if not is_correct:
         await update.callback_query.edit_message_text("❌ *Неправильно!*", parse_mode="Markdown")
+        
+        # Проверяем, ответил ли уже соперник
+        if duel.get(f"{other_key}_answered"):
+            # Оба ответили → показываем правильный ответ и переходим к следующему вопросу
+            duel["question_active"] = False
+            duel["waiting_for_answer"] = False
+            
+            correct_text = q["options"][q["correct"]]
+            
+            # Проверяем, получил ли кто-то очко за этот вопрос
+            if not duel.get("p1_score_increment") and not duel.get("p2_score_increment"):
+                await context.bot.send_message(
+                    duel["player1"], 
+                    f"❌ Оба ответили неправильно!\n✅ *Правильный ответ:* {correct_text}",
+                    parse_mode="Markdown"
+                )
+                await context.bot.send_message(
+                    duel["player2"], 
+                    f"❌ Оба ответили неправильно!\n✅ *Правильный ответ:* {correct_text}",
+                    parse_mode="Markdown"
+                )
+            else:
+                # Кто-то уже получил очко (но это не должно случиться, т.к. мы блокируем)
+                pass
+            
+            await asyncio.sleep(1.5)
+            duel["turn"] += 1
+            await ask_question_friend(update, context, duel_id)
         return
     
-    other_key = "p2" if is_p1 else "p1"
+    # Игрок ответил правильно
+    # Проверяем, не получил ли уже соперник очко за этот вопрос
     if duel.get(f"{other_key}_score_increment"):
         await update.callback_query.edit_message_text("⏳ Соперник уже ответил правильно на этот вопрос!")
         return
