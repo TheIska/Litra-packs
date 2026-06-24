@@ -251,6 +251,7 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_selection[opponent_id]["duel_type"] = "friend"
         user_selection[opponent_id]["opponent"] = user_id
 
+    # Отправляем выбор героев обоим игрокам
     await show_hero_selection_for_duel(update, context, user_id, query.message.chat_id, "friend")
     await show_hero_selection_for_duel(update, context, opponent_id, query.message.chat_id, "friend")
 
@@ -368,7 +369,9 @@ async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "bot")
 
 
-async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_type):
+async def show_hero_selection_for_duel(update, update_context, user_id, chat_id, duel_type):
+    """Показывает выбор героев для дуэли"""
+    context = update_context
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
 
@@ -378,6 +381,8 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
     data = user_selection[user_id]
     selected = data["selected"]
     page = data["page"]
+
+    has_last_selection = user_id in last_selection and len(last_selection[user_id]) == 3
 
     if len(hero_keys) <= 3:
         user_selection[user_id]["selected"] = hero_keys.copy()
@@ -390,6 +395,21 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
     end = min(start + per_page, len(hero_keys))
 
     keyboard = []
+    
+    if has_last_selection:
+        valid_last_selection = []
+        for hero_key in last_selection.get(user_id, []):
+            if hero_key in collection:
+                valid_last_selection.append(hero_key)
+        
+        if len(valid_last_selection) == 3:
+            keyboard.append([
+                InlineKeyboardButton(
+                    "🔄 Выбрать как в прошлый раз", 
+                    callback_data=f"hsel_last"
+                )
+            ])
+
     for i in range(start, end):
         hero = collection[hero_keys[i]]
         rarity = hero.get("rarity", "обычный")
@@ -443,6 +463,98 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
         print(f"❌ Ошибка отправки выбора героев: {e}")
 
 
+async def show_hero_selection_edit(update, context, user_id, chat_id, duel_type):
+    """Редактирует текущее сообщение с выбором героев"""
+    collection = get_collection(user_id)
+    hero_keys = list(collection.keys())
+
+    if user_id not in user_selection:
+        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": duel_type}
+
+    data = user_selection[user_id]
+    selected = data["selected"]
+    page = data["page"]
+
+    has_last_selection = user_id in last_selection and len(last_selection[user_id]) == 3
+
+    if len(hero_keys) <= 3:
+        user_selection[user_id]["selected"] = hero_keys.copy()
+        await start_duel_after_selection(update, context, user_id)
+        return
+
+    per_page = 5
+    total_pages = (len(hero_keys) + per_page - 1) // per_page
+    start = page * per_page
+    end = min(start + per_page, len(hero_keys))
+
+    keyboard = []
+    
+    if has_last_selection:
+        valid_last_selection = []
+        for hero_key in last_selection.get(user_id, []):
+            if hero_key in collection:
+                valid_last_selection.append(hero_key)
+        
+        if len(valid_last_selection) == 3:
+            keyboard.append([
+                InlineKeyboardButton(
+                    "🔄 Выбрать как в прошлый раз", 
+                    callback_data=f"hsel_last"
+                )
+            ])
+
+    for i in range(start, end):
+        hero = collection[hero_keys[i]]
+        rarity = hero.get("rarity", "обычный")
+        is_selected = hero_keys[i] in selected
+        emoji = "✅" if is_selected else "⬜"
+        save_chance = SAVE_CHANCES.get(rarity, 0)
+        r_emoji = {"легендарный": "👑", "эпический": "⭐", "редкий": "🔵", "обычный": "📘"}.get(rarity, "📘")
+        mult = WORK_MULTIPLIERS.get(rarity, 1)
+        keyboard.append([InlineKeyboardButton(f"{emoji} {r_emoji} {hero['name'][:12]} (x{mult}, {save_chance}%)", callback_data=f"hsel|{i}")])
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"hpage|{page-1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("➡️ Вперед", callback_data=f"hpage|{page+1}"))
+    if nav:
+        keyboard.append(nav)
+
+    keyboard.append([InlineKeyboardButton(f"📄 Страница {page+1}/{total_pages}", callback_data="noop")])
+    keyboard.append([InlineKeyboardButton("⚔️ Начать дуэль", callback_data="startduel")])
+    keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="main_menu")])
+
+    total_save = sum(SAVE_CHANCES.get(collection[k].get("rarity", "обычный"), 0) for k in selected)
+    
+    bonus_text = ""
+    if selected:
+        work_weights = defaultdict(int)
+        for key in selected:
+            hero = collection[key]
+            work = hero.get("book", "")
+            if work:
+                work_weights[work] += WORK_MULTIPLIERS.get(hero.get("rarity", "обычный"), 1)
+        
+        if work_weights:
+            bonus_text = "\n\n📚 *Бонусы к вопросам:*"
+            for work, weight in work_weights.items():
+                bonus_text += f"\n• {work}: x{weight}"
+        
+        bonus_text += f"\n\n🔄 *Шанс спасения:* {total_save}% (один раз)"
+
+    text = f"⚔️ *Выбор героев для дуэли*\n\nВыбери *3 героя*\nВыбрано: {len(selected)}/3\n\n⬜ — не выбран, ✅ — выбран\nВ скобках: множитель и шанс спасения\n👑x10 12% ⭐x4 9% 🔵x3 6% 📘x2 3%{bonus_text}"
+
+    try:
+        await update.callback_query.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        print(f"❌ Ошибка редактирования выбора героев: {e}")
+
+
 async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try:
@@ -453,6 +565,16 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     data = query.data
     user_id = query.from_user.id
     chat_id = query.message.chat_id
+
+    if data == "hsel_last":
+        # Используем прошлый выбор
+        if user_id in last_selection and len(last_selection[user_id]) == 3:
+            user_selection[user_id]["selected"] = last_selection[user_id].copy()
+            await query.edit_message_text("✅ Использован прошлый выбор героев!")
+            await show_hero_selection_edit(update, context, user_id, chat_id, user_selection[user_id].get("duel_type", "friend"))
+        else:
+            await query.edit_message_text("❌ Нет сохранённого выбора героев.")
+        return
 
     if data.startswith("hsel|"):
         idx = int(data.split("|")[1])
@@ -474,14 +596,17 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         user_selection[user_id]["selected"] = selected
-        last_selection[user_id] = selected.copy()
+        if len(selected) == 3:
+            last_selection[user_id] = selected.copy()
         
-        await show_hero_selection_for_duel(update, context, user_id, chat_id, user_data.get("duel_type", "friend"))
+        await show_hero_selection_edit(update, context, user_id, chat_id, user_data.get("duel_type", "friend"))
+        return
 
     elif data.startswith("hpage|"):
         page = int(data.split("|")[1])
         user_selection[user_id]["page"] = page
-        await show_hero_selection_for_duel(update, context, user_id, chat_id, user_selection[user_id].get("duel_type", "friend"))
+        await show_hero_selection_edit(update, context, user_id, chat_id, user_selection[user_id].get("duel_type", "friend"))
+        return
 
     elif data == "startduel":
         selected = user_selection.get(user_id, {}).get("selected", [])
