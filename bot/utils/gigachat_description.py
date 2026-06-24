@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import base64
 from typing import Optional
 from datetime import datetime, timedelta
 
@@ -29,11 +30,16 @@ def get_access_token() -> Optional[str]:
     
     url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     
+    # Кодируем Client ID и Secret в Base64
+    auth_string = f"{GIGACHAT_CLIENT_ID}:{GIGACHAT_CLIENT_SECRET}"
+    auth_bytes = auth_string.encode('ascii')
+    auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+    
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
         "RqUID": "12345678-1234-1234-1234-123456789012",
-        "Authorization": f"Basic {GIGACHAT_CLIENT_ID}"
+        "Authorization": f"Basic {auth_b64}"  # <-- Используем Base64
     }
     
     data = {
@@ -48,7 +54,8 @@ def get_access_token() -> Optional[str]:
             _token_cache["expires_at"] = datetime.now() + timedelta(seconds=result.get("expires_at", 1800))
             return _token_cache["access_token"]
         else:
-            print(f"❌ Ошибка получения токена GigaChat: {response.status_code} - {response.text}")
+            print(f"❌ Ошибка получения токена GigaChat: {response.status_code}")
+            print(f"   Ответ: {response.text[:200]}")
             return None
     except Exception as e:
         print(f"❌ Ошибка GigaChat auth: {e}")
@@ -82,7 +89,6 @@ def get_hero_description_gigachat_sync(hero_name: str, author: str, book: str) -
 - Без смайликов
 - Без форматирования
 - Интересно для школьников
-- Упомяни ключевую характеристику героя
 """
         
         payload = {
@@ -107,6 +113,7 @@ def get_hero_description_gigachat_sync(hero_name: str, author: str, book: str) -
             return None
         else:
             print(f"❌ Ошибка GigaChat: {response.status_code}")
+            print(f"   Ответ: {response.text[:200]}")
             return None
                     
     except Exception as e:
@@ -114,7 +121,7 @@ def get_hero_description_gigachat_sync(hero_name: str, author: str, book: str) -
         return None
 
 
-# БАЗОВЫЕ ОПИСАНИЯ для всех героев (чтобы не было "временно недоступно")
+# БАЗОВЫЕ ОПИСАНИЯ для всех героев
 def get_basic_description(hero_name: str, author: str, book: str) -> str:
     """Возвращает базовое описание для героя"""
     descriptions = {
@@ -123,9 +130,6 @@ def get_basic_description(hero_name: str, author: str, book: str) -> str:
         "Татьяна Ларина": "Идеал русской женщины в романе Пушкина. Чистая, искренняя, верная своим чувствам.",
         "Владимир Ленский": "Молодой поэт, романтик, друг Онегина. Верит в идеалы, погибает на дуэли.",
         "Ольга Ларина": "Младшая сестра Татьяны, ветреная и жизнерадостная.",
-        "Моцарт": "Гениальный композитор из трагедии Пушкина. Символ чистого искусства.",
-        "Сальери": "Завистливый композитор из трагедии Пушкина. Символ ремесла, убивающего искусство.",
-        "Годунов": "Царь Борис из трагедии Пушкина. Трагическая фигура, мучимая совестью.",
         "Германн": "Герой «Пиковой дамы», одержимый тайной трёх карт. Азартный и безумный.",
         "Лиза": "Героиня «Пиковой дамы», воспитанница старой графини. Жертва любви к Германну.",
         "Самсон Вырин": "Станционный смотритель из повести Пушкина. Символ маленького человека.",
@@ -134,7 +138,6 @@ def get_basic_description(hero_name: str, author: str, book: str) -> str:
         "Григорий Печорин": "Герой романа М.Ю. Лермонтова. Сложная и противоречивая личность, ищущая смысл жизни.",
         "Бэла": "Черкешенка, которую похитил Печорин. Символ чистой красоты.",
         "Максим Максимыч": "Добрый штабс-капитан. Воплощение честности и душевной теплоты.",
-        "Вулич": "Офицер из «Фаталиста», испытывающий судьбу.",
         "Мцыри": "Герой поэмы Лермонтова, юноша, бежавший из монастыря. Символ свободы.",
         
         # Гоголь
@@ -143,11 +146,10 @@ def get_basic_description(hero_name: str, author: str, book: str) -> str:
         "Собакевич": "Помещик, похожий на медведя. Расчётливый и жадный, но честный в делах.",
         "Манилов": "Помещик, живущий в мире грёз. Сентиментальный и неспособный к хозяйству.",
         "Коробочка": "Помещица, недалёкая, но хозяйственная. Боится продешевить.",
-        "Тарас Бульба": "Запорожский казак. Суровый воин и патриот. Готов пожертвовать сыном ради Отчизны.",
-        "Андрий Бульба": "Младший сын Тараса. Предаёт отца ради любви. Погибает от руки отца.",
+        "Тарас Бульба": "Запорожский казак. Суровый воин и патриот.",
+        "Андрий Бульба": "Младший сын Тараса. Предаёт отца ради любви.",
         "Остап Бульба": "Старший сын Тараса. Настоящий воин. Мужественно принимает смерть.",
         "Хлестаков": "Герой «Ревизора», лже-ревизор. Символ пустоты и вранья.",
-        "Городничий": "Глава города из «Ревизора». Воплощение бюрократии.",
         
         # Тургенев
         "Евгений Базаров": "Герой романа И.С. Тургенева. Нигилист, отрицающий все устои. Умный и дерзкий.",
@@ -155,7 +157,6 @@ def get_basic_description(hero_name: str, author: str, book: str) -> str:
         "Павел Кирсанов": "Дядя Аркадия, бывший светский лев. Гордый и аристократичный.",
         "Анна Одинцова": "Богатая вдова, в которую влюбляется Базаров. Умная, красивая, но холодная.",
         "Герасим": "Герой рассказа «Муму», немой дворник. Символ бесправия.",
-        "Катерина": "Робкая и застенчивая сестра Одинцовой. Воплощение семейного счастья.",
         
         # Достоевский
         "Родион Раскольников": "Герой романа Ф.М. Достоевского. Одержимый идеей сверхчеловека. Проходит от преступления к покаянию.",
@@ -176,16 +177,13 @@ def get_basic_description(hero_name: str, author: str, book: str) -> str:
         "Ольга Ильинская": "Девушка, в которую влюблён Обломов. Символ деятельной любви.",
     }
     
-    # Ищем точное совпадение
     if hero_name in descriptions:
         return descriptions[hero_name]
     
-    # Ищем частичное совпадение
     for key, value in descriptions.items():
         if key in hero_name or hero_name in key:
             return value
     
-    # Если не нашли - возвращаем базовое описание
     return f"{hero_name} — литературный герой произведения «{book}» автора {author}. Персонаж, оставивший след в русской литературе."
 
 
@@ -196,7 +194,6 @@ async def get_hero_description_cached(hero_name: str, author: str, book: str) ->
     conn = get_connection()
     c = conn.cursor()
     
-    # Создаем таблицу для кеша если нет
     c.execute('''
         CREATE TABLE IF NOT EXISTS hero_descriptions (
             hero_key TEXT PRIMARY KEY,
@@ -208,7 +205,6 @@ async def get_hero_description_cached(hero_name: str, author: str, book: str) ->
     
     hero_key = f"{author} – {hero_name}"
     
-    # Ищем в кеше
     c.execute("SELECT description FROM hero_descriptions WHERE hero_key = ?", (hero_key,))
     row = c.fetchone()
     
@@ -216,15 +212,12 @@ async def get_hero_description_cached(hero_name: str, author: str, book: str) ->
         conn.close()
         return row[0]
     
-    # Пытаемся через GigaChat
     description = get_hero_description_gigachat_sync(hero_name, author, book)
     
-    # Если GigaChat не ответил - используем базовое описание
     if not description:
         description = get_basic_description(hero_name, author, book)
         print(f"ℹ️ Использовано базовое описание для {hero_name}")
     
-    # Сохраняем в кеш
     c.execute(
         "INSERT OR REPLACE INTO hero_descriptions (hero_key, description) VALUES (?, ?)",
         (hero_key, description)
