@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from ..database import get_collection
 from ..models.hero import HEROES_BY_NUMBER, get_total_heroes
 from ..utils.image_generator import create_hero_card
+from ..utils.gigachat_description import generate_description_for_hero
 import logging
 import traceback
 
@@ -10,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 CARDS_PER_PAGE = 8
 
+
 async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показывает альбом со всеми героями"""
     try:
         print("🔵 show_album вызван")
         
@@ -28,11 +29,9 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         total_heroes = get_total_heroes()
         total_pages = (total_heroes - 1) // CARDS_PER_PAGE + 1
         
-        # Получаем коллекцию пользователя
         collection = get_collection(user_id)
         print(f"📊 Коллекция пользователя {user_id}: {len(collection)} карт")
         
-        # Собираем номера выбитых карт
         collected_numbers = set()
         for hero in collection.values():
             number = hero.get('card_number', 0)
@@ -41,7 +40,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         print(f"📊 Всего выбито: {len(collected_numbers)}/{total_heroes}")
         
-        # Получаем всех героев для текущей страницы
         start_idx = page * CARDS_PER_PAGE
         end_idx = min(start_idx + CARDS_PER_PAGE, total_heroes)
         sorted_heroes = sorted(HEROES_BY_NUMBER.items())
@@ -73,7 +71,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 callback_data = f"album_card_{number}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
-        # Кнопки навигации
         nav_buttons = []
         if page > 0:
             nav_buttons.append(InlineKeyboardButton("◀️ Назад", callback_data="album_prev"))
@@ -82,7 +79,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         if nav_buttons:
             keyboard.append(nav_buttons)
         
-        # Быстрые переходы по номерам
         number_buttons = []
         for i in range(1, 10):
             num = i * 25
@@ -94,19 +90,16 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # ПРОВЕРКА: если сообщение содержит фото, отправляем новое вместо редактирования
         if query and query.message:
             try:
-                # Проверяем, есть ли в сообщении текст
                 if query.message.text:
                     await query.edit_message_text(
                         text,
                         reply_markup=reply_markup,
                         parse_mode="Markdown"
                     )
-                    print("✅ Альбом обновлён (редактирование)")
+                    print("✅ Альбом обновлён")
                 else:
-                    # Если сообщение содержит фото, удаляем и отправляем новое
                     try:
                         await query.message.delete()
                     except:
@@ -117,10 +110,9 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                         reply_markup=reply_markup,
                         parse_mode="Markdown"
                     )
-                    print("✅ Альбом отправлен новым сообщением (было фото)")
+                    print("✅ Альбом отправлен новым сообщением")
             except Exception as e:
                 print(f"❌ Ошибка при редактировании: {e}")
-                # Если ошибка - отправляем новое сообщение
                 try:
                     await query.message.delete()
                 except:
@@ -131,7 +123,7 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                     reply_markup=reply_markup,
                     parse_mode="Markdown"
                 )
-                print("✅ Альбом отправлен новым сообщением (после ошибки)")
+                print("✅ Альбом отправлен новым сообщением")
         else:
             await update.message.reply_text(
                 text,
@@ -146,7 +138,6 @@ async def show_album(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Навигация по альбому"""
     try:
         query = update.callback_query
         action = query.data
@@ -178,9 +169,8 @@ async def album_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показывает карту по номеру (по нажатию на кнопку)"""
     try:
-        print("🔴🔴🔴🔴🔴 show_card_by_number ВЫЗВАНА! 🔴🔴🔴🔴🔴")
+        print("🔴 show_card_by_number ВЫЗВАНА!")
         
         query = update.callback_query
         print(f"🔴 query.data: {query.data}")
@@ -197,10 +187,8 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         number = int(query.data.split("_")[2])
         print(f"🔍 Номер карты: {number}")
         
-        # Получаем коллекцию пользователя
         collection = get_collection(user_id)
         
-        # Проверяем, есть ли карта в коллекции
         card = None
         for hero in collection.values():
             if hero.get('card_number', 0) == number:
@@ -223,10 +211,20 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
+        # Генерируем описание через GigaChat
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="⏳ Генерирую описание героя..."
+        )
+        
+        description = await generate_description_for_hero(hero_info)
+        
         if card:
             try:
                 print(f"🎴 Генерируем карточку для {hero_info['name']}")
-                image_bytes = create_hero_card(hero_info)
+                
+                # Создаем карточку (без описания на карте)
+                image_bytes = await create_hero_card(hero_info)
                 
                 if hasattr(image_bytes, 'getvalue'):
                     image_data = image_bytes.getvalue()
@@ -235,15 +233,21 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
                     image_data = image_bytes
                     print(f"✅ Карточка создана")
                 
+                # Капшн с описанием под картинкой
+                caption = (
+                    f"✅ **{hero_info['name']}**\n"
+                    f"🆔 № {number:03d}\n"
+                    f"✍️ {hero_info['author']}\n"
+                    f"📚 {hero_info['book']}\n"
+                    f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
+                    f"📝 *Описание:*\n{description}\n\n"
+                    "🎉 Эта карта есть в вашем альбоме!"
+                )
+                
                 await context.bot.send_photo(
                     chat_id=chat_id,
                     photo=image_data,
-                    caption=f"✅ **{hero_info['name']}**\n"
-                           f"🆔 № {number:03d}\n"
-                           f"✍️ {hero_info['author']}\n"
-                           f"📚 {hero_info['book']}\n"
-                           f"⭐ {hero_info.get('rarity', 'обычный').upper()}\n\n"
-                           "🎉 Эта карта есть в вашем альбоме!",
+                    caption=caption,
                     parse_mode="Markdown"
                 )
                 print(f"✅ Карточка отправлена в чат {chat_id}!")
@@ -264,6 +268,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             keyboard = [[InlineKeyboardButton("🔙 Назад в альбом", callback_data="album_back")]]
             
+            # Показываем информацию без карточки (герой не выпал)
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"❌ **{hero_info['name']}**\n"
@@ -271,6 +276,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
                      f"{rarity_emoji} {hero_info.get('rarity', 'обычный').upper()}\n"
                      f"✍️ {hero_info['author']}\n"
                      f"📚 {hero_info['book']}\n\n"
+                     f"📝 *Описание:*\n{description}\n\n"
                      "😔 Этого героя ещё нет в вашем альбоме!\n"
                      "Откройте паки, чтобы найти его.",
                 reply_markup=InlineKeyboardMarkup(keyboard),
@@ -291,7 +297,6 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def album_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Возврат в альбом"""
     try:
         print("🟢 album_back вызван")
         query = update.callback_query
