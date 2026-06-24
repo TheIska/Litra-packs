@@ -1,7 +1,13 @@
+cd /app
+cat > bot/handlers/start.py << 'EOF'
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, get_collection
+from ..friends import get_friends, add_friend, is_friend, get_user_by_id
 from datetime import datetime, timedelta
+import hashlib
+import time
+import random
 
 ADMIN_ID = 6082384471
 
@@ -28,6 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🛒 Магазин паков", callback_data="shop")],
         [InlineKeyboardButton("📚 Мой альбом", callback_data="album")],
         [InlineKeyboardButton("⚔️ Дуэль", callback_data="duel")],
+        [InlineKeyboardButton("👥 Друзья", callback_data="friends_menu")],
         [InlineKeyboardButton("📩 Сообщить об ошибке", callback_data="report_error")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -72,6 +79,369 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
+
+
+async def friends_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Меню друзей"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    friends = get_friends(user_id)
+    
+    text = "👥 **Друзья**\n\n"
+    
+    if friends:
+        text += f"У вас *{len(friends)}* друзей:\n\n"
+        for fid in friends[:10]:
+            try:
+                chat = await context.bot.get_chat(fid)
+                name = chat.first_name or f"ID: {fid}"
+            except:
+                name = f"ID: {fid}"
+            text += f"• {name} (ID: `{fid}`)\n"
+        if len(friends) > 10:
+            text += f"\n...и ещё {len(friends) - 10} друзей"
+    else:
+        text += "У вас пока нет друзей.\n"
+    
+    text += "\n💡 **Как добавить друзей:**\n"
+    text += "• По ID (если знаете)\n"
+    text += "• По ссылке-приглашению\n"
+    text += "• Из списка игроков\n"
+    text += "• По имени пользователя"
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ По ID", callback_data="friends_add_id")],
+        [InlineKeyboardButton("🔗 По ссылке", callback_data="friends_invite")],
+        [InlineKeyboardButton("📋 Из списка игроков", callback_data="friends_from_list")],
+        [InlineKeyboardButton("👤 По имени пользователя", callback_data="friends_add_username")],
+        [InlineKeyboardButton("⚔️ Дуэль с другом", callback_data="duel_friends")],
+        [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
+    ]
+    
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def friends_add_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление друга по ID"""
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat_id
+    
+    text = (
+        "➕ **Добавить друга по ID**\n\n"
+        "Введите ID друга в чат.\n"
+        "ID можно узнать, отправив команду `/id` в личные сообщения боту.\n\n"
+        "Например: `123456789`"
+    )
+    keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")]]
+    
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    context.user_data['waiting_for_friend_id'] = True
+
+
+async def friends_from_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление друга из списка игроков"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    
+    from ..database import get_all_users
+    users = get_all_users()
+    friends = get_friends(user_id)
+    
+    available_users = [u for u in users if u["user_id"] != user_id and u["user_id"] not in friends]
+    
+    if not available_users:
+        await query.edit_message_text(
+            "😴 Нет доступных игроков для добавления.\n\nВсе игроки уже у вас в друзьях!",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")]])
+        )
+        return
+    
+    keyboard = []
+    for user in available_users[:20]:
+        try:
+            chat = await context.bot.get_chat(user["user_id"])
+            name = chat.first_name or f"ID: {user['user_id']}"
+        except:
+            name = f"ID: {user['user_id']}"
+        hero_count = len(get_collection(user["user_id"]))
+        keyboard.append([
+            InlineKeyboardButton(
+                f"👤 {name} ({hero_count} героев)", 
+                callback_data=f"friends_add_from_list|{user['user_id']}"
+            )
+        ])
+    
+    keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")])
+    
+    await query.edit_message_text(
+        "👥 **Выбери игрока для добавления в друзья:**",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def friends_add_from_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление друга из списка"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    friend_id = int(query.data.split("|")[1])
+    
+    if user_id == friend_id:
+        await query.edit_message_text("❌ Нельзя добавить самого себя!")
+        return
+    
+    if is_friend(user_id, friend_id):
+        await query.edit_message_text("✅ Этот пользователь уже в вашем списке друзей!")
+        return
+    
+    if add_friend(user_id, friend_id):
+        try:
+            chat = await context.bot.get_chat(friend_id)
+            name = chat.first_name or "Пользователь"
+        except:
+            name = f"ID {friend_id}"
+        
+        await query.edit_message_text(
+            f"✅ *{name}* добавлен в список друзей!",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")]])
+        )
+    else:
+        await query.edit_message_text("❌ Ошибка при добавлении друга.")
+
+
+async def friends_add_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление друга по имени пользователя"""
+    query = update.callback_query
+    await query.answer()
+    
+    text = (
+        "👤 **Добавить друга по имени пользователя**\n\n"
+        "Введите @username друга в чат.\n"
+        "Например: `@ivan_petrov`\n\n"
+        "Бот найдёт пользователя и отправит запрос на добавление в друзья."
+    )
+    keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")]]
+    
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    context.user_data['waiting_for_username'] = True
+
+
+async def friends_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Приглашение друга по ссылке"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    bot_username = (await context.bot.get_me()).username
+    
+    raw = f"{user_id}_{time.time()}_{random.randint(1000,9999)}"
+    code = hashlib.md5(raw.encode()).hexdigest()[:8].upper()
+    
+    context.user_data['invite_code'] = code
+    context.user_data['invite_time'] = time.time()
+    context.user_data['inviter_id'] = user_id
+    
+    invite_link = f"https://t.me/{bot_username}?start=friend_{code}"
+    
+    text = (
+        "🔗 **Пригласить друга**\n\n"
+        "Отправь другу ссылку-приглашение:\n"
+        f"`{invite_link}`\n\n"
+        "⚠️ Ссылка действует *5 минут*"
+    )
+    keyboard = [
+        [InlineKeyboardButton("📋 Копировать ссылку", callback_data=f"copy_invite|{invite_link}")],
+        [InlineKeyboardButton("📤 Поделиться", callback_data=f"share_invite|{invite_link}")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")],
+    ]
+    
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def copy_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    link = query.data.split("|")[1]
+    await query.edit_message_text(
+        f"🔗 Ссылка скопирована! Отправь другу:\n\n`{link}`\n\n⚠️ Ссылка действует 5 минут.",
+        parse_mode="Markdown"
+    )
+
+
+async def share_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    link = query.data.split("|")[1]
+    keyboard = [
+        [InlineKeyboardButton("📋 Копировать ссылку", callback_data=f"copy_invite|{link}")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")],
+    ]
+    text = f"🔗 *Поделись ссылкой с другом:*\n\n`{link}`\n\nИли отправь текст:\n*Привет! Давай добавимся в друзья в боте «Литературный Герой»!*\nПерейди по ссылке: {link}"
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def handle_friend_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает пригласительную ссылку для друзей"""
+    if not context.args or not context.args[0].startswith("friend_"):
+        return
+
+    code = context.args[0].replace("friend_", "")
+    user_id = update.effective_user.id
+    
+    if context.user_data.get('invite_code') != code:
+        await update.message.reply_text("❌ Недействительная ссылка-приглашение.")
+        return
+    
+    if time.time() - context.user_data.get('invite_time', 0) > 300:
+        await update.message.reply_text("❌ Ссылка истекла (5 минут).")
+        return
+    
+    inviter_id = context.user_data.get('inviter_id')
+    if not inviter_id:
+        await update.message.reply_text("❌ Ошибка: не найден пригласивший.")
+        return
+    
+    if user_id == inviter_id:
+        await update.message.reply_text("❌ Нельзя пригласить самого себя!")
+        return
+    
+    if is_friend(user_id, inviter_id):
+        await update.message.reply_text("✅ Вы уже друзья!")
+        return
+    
+    if add_friend(user_id, inviter_id):
+        try:
+            chat = await context.bot.get_chat(inviter_id)
+            name = chat.first_name or "Пользователь"
+        except:
+            name = f"ID {inviter_id}"
+        
+        await update.message.reply_text(f"✅ *{name}* добавлен в список друзей!", parse_mode="Markdown")
+        
+        try:
+            await context.bot.send_message(
+                chat_id=inviter_id,
+                text=f"✅ *{update.effective_user.first_name}* принял ваше приглашение и стал вашим другом!",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
+    else:
+        await update.message.reply_text("❌ Ошибка при добавлении друга.")
+
+
+async def handle_add_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает добавление друга по ID"""
+    if not context.user_data.get('waiting_for_friend_id'):
+        return
+    
+    user_id = update.effective_user.id
+    try:
+        friend_id = int(update.message.text.strip())
+        
+        if friend_id == user_id:
+            await update.message.reply_text("❌ Нельзя добавить самого себя!")
+            context.user_data['waiting_for_friend_id'] = False
+            return
+        
+        user = get_user_by_id(friend_id)
+        if not user:
+            await update.message.reply_text("❌ Пользователь с таким ID не найден!")
+            context.user_data['waiting_for_friend_id'] = False
+            return
+        
+        if is_friend(user_id, friend_id):
+            await update.message.reply_text("✅ Этот пользователь уже в вашем списке друзей!")
+            context.user_data['waiting_for_friend_id'] = False
+            return
+        
+        if add_friend(user_id, friend_id):
+            try:
+                chat = await context.bot.get_chat(friend_id)
+                name = chat.first_name or "Пользователь"
+            except:
+                name = f"ID {friend_id}"
+            
+            await update.message.reply_text(f"✅ *{name}* добавлен в список друзей!", parse_mode="Markdown")
+            context.user_data['waiting_for_friend_id'] = False
+            await friends_menu(update, context)
+        else:
+            await update.message.reply_text("❌ Ошибка при добавлении друга. Попробуйте позже.")
+            
+    except ValueError:
+        await update.message.reply_text("❌ Некорректный ID. Введите число.")
+
+
+async def handle_add_by_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает добавление друга по username"""
+    if not context.user_data.get('waiting_for_username'):
+        return
+    
+    username = update.message.text.strip()
+    if username.startswith('@'):
+        username = username[1:]
+    
+    try:
+        chat = await context.bot.get_chat(username)
+        friend_id = chat.id
+        
+        user_id = update.effective_user.id
+        
+        if user_id == friend_id:
+            await update.message.reply_text("❌ Нельзя добавить самого себя!")
+            context.user_data['waiting_for_username'] = False
+            return
+        
+        user = get_user_by_id(friend_id)
+        if not user:
+            await update.message.reply_text("❌ Пользователь не найден в базе данных бота.")
+            context.user_data['waiting_for_username'] = False
+            return
+        
+        if is_friend(user_id, friend_id):
+            await update.message.reply_text("✅ Этот пользователь уже в вашем списке друзей!")
+            context.user_data['waiting_for_username'] = False
+            return
+        
+        if add_friend(user_id, friend_id):
+            name = chat.first_name or "Пользователь"
+            await update.message.reply_text(
+                f"✅ *{name}* добавлен в список друзей!",
+                parse_mode="Markdown"
+            )
+            context.user_data['waiting_for_username'] = False
+            await friends_menu(update, context)
+        else:
+            await update.message.reply_text("❌ Ошибка при добавлении друга.")
+            
+    except Exception as e:
+        await update.message.reply_text(f"❌ Пользователь с username @{username} не найден.")
+        context.user_data['waiting_for_username'] = False
 
 
 async def report_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,7 +567,7 @@ async def show_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     user = get_user(user_id)
     
-    msg = f"💰 **Твой баланс:** {user['coins']} монет.\n\nЗарабатывай монеты, участвуя в дуэлях (победа +10, поражение -5) и открывая паки!"
+    msg = f"💰 **Твой баланс:** {user['coins']} монет.\n\nЗарабатывай монеты, участвуя в дуэлях (победа +20, поражение -5) и открывая паки!"
     keyboard = [[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]]
     
     if query.message.photo:
@@ -262,3 +632,4 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
+EOF
