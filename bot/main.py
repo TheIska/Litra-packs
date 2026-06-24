@@ -11,6 +11,7 @@ from .handlers.start import (
     shop, 
     report_error, 
     forward_to_admin,
+    id_command,
     friends_menu,
     friends_add_id,
     friends_invite,
@@ -19,9 +20,7 @@ from .handlers.start import (
     handle_friend_invite,
     friends_from_list,
     friends_add_from_list,
-    friends_add_username,
     handle_add_friend,
-    handle_add_by_username
 )
 from .handlers.pack import free_pack, small_pack, medium_pack, large_pack
 from .handlers.album import (
@@ -66,6 +65,7 @@ def main():
     app.add_handler(CommandHandler("start", handle_invite_link))
     app.add_handler(CommandHandler("start", handle_friend_invite))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("duel", duel_command))
     app.add_handler(CommandHandler("stopduel", stop_duel_command))
     app.add_handler(CommandHandler("addcoins", add_coins_command))
@@ -100,7 +100,6 @@ def main():
     app.add_handler(CallbackQueryHandler(share_invite, pattern="^share_invite\|"))
     app.add_handler(CallbackQueryHandler(friends_from_list, pattern="^friends_from_list$"))
     app.add_handler(CallbackQueryHandler(friends_add_from_list, pattern="^friends_add_from_list\|"))
-    app.add_handler(CallbackQueryHandler(friends_add_username, pattern="^friends_add_username$"))
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
@@ -129,7 +128,6 @@ def main():
 
     # ========== ВВОД ДЛЯ ДРУЗЕЙ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_friend))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_by_username))
 
     # ========== ПЕРЕСЫЛКА СООБЩЕНИЙ АДМИНУ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
