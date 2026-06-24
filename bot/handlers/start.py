@@ -1,5 +1,3 @@
-cd /app
-cat > bot/handlers/start.py << 'EOF'
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, get_collection
