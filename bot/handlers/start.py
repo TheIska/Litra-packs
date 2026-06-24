@@ -630,4 +630,3 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
-EOF
