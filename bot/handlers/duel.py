@@ -19,6 +19,7 @@ duels = {}
 user_duel = {}
 user_selection = {}
 invite_codes = {}
+last_selection = {}
 
 SAVE_CHANCES = {
     "легендарный": 12,
@@ -144,7 +145,6 @@ async def duel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duel_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает список друзей для дуэли"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -188,7 +188,6 @@ async def duel_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправка запроса другу"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -201,6 +200,9 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if len(get_collection(friend_id)) < 3:
         await query.edit_message_text("❌ У этого игрока меньше 3 героев.")
         return
+
+    context.user_data['duel_inviter'] = user_id
+    context.user_data['duel_invitee'] = friend_id
 
     keyboard = [
         [InlineKeyboardButton("✅ Принять дуэль", callback_data=f"duel_accept|{user_id}")],
@@ -217,7 +219,6 @@ async def duel_friend_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Принятие дуэли"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -231,7 +232,29 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
         return
 
-    await proceed_to_hero_selection(update, context, user_id, query.message.chat_id, opponent_id, False)
+    # Уведомляем пригласившего
+    await context.bot.send_message(
+        opponent_id,
+        f"✅ *{update.effective_user.first_name}* принял ваше приглашение на дуэль!\n\nВыбирайте героев..."
+    )
+
+    # Запускаем выбор героев для ОБОИХ игроков
+    if user_id not in user_selection:
+        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": opponent_id}
+    else:
+        user_selection[user_id]["duel_type"] = "friend"
+        user_selection[user_id]["opponent"] = opponent_id
+    
+    if opponent_id not in user_selection:
+        user_selection[opponent_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
+    else:
+        user_selection[opponent_id]["duel_type"] = "friend"
+        user_selection[opponent_id]["opponent"] = user_id
+
+    await show_hero_selection_for_duel(update, context, user_id, query.message.chat_id, "friend")
+    await show_hero_selection_for_duel(update, context, opponent_id, query.message.chat_id, "friend")
+
+    await query.edit_message_text("⚔️ *Дуэль принята! Выбирайте героев...*", parse_mode="Markdown")
 
 
 async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -241,7 +264,6 @@ async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duel_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Создаёт ссылку для приглашения друга"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -285,7 +307,6 @@ async def share_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает пригласительную ссылку"""
     if not context.args or not context.args[0].startswith("duel_"):
         return
 
@@ -311,11 +332,27 @@ async def handle_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     invite_codes.pop(code, None)
-    await proceed_to_hero_selection(update, context, user_id, update.effective_chat.id, inviter_id, True)
+    
+    # Запускаем выбор героев для ОБОИХ игроков
+    if user_id not in user_selection:
+        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": inviter_id}
+    else:
+        user_selection[user_id]["duel_type"] = "friend"
+        user_selection[user_id]["opponent"] = inviter_id
+    
+    if inviter_id not in user_selection:
+        user_selection[inviter_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
+    else:
+        user_selection[inviter_id]["duel_type"] = "friend"
+        user_selection[inviter_id]["opponent"] = user_id
+
+    await show_hero_selection_for_duel(update, context, user_id, update.effective_chat.id, "friend")
+    await show_hero_selection_for_duel(update, context, inviter_id, update.effective_chat.id, "friend")
+
+    await update.message.reply_text("⚔️ *Дуэль началась! Выбирайте героев...*", parse_mode="Markdown")
 
 
 async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало дуэли с ботом"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -331,23 +368,7 @@ async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "bot")
 
 
-async def proceed_to_hero_selection(update, context, user_id, chat_id, opponent_id, invited=False):
-    """Переход к выбору героев"""
-    duel_type = "friend" if invited else "friend"
-    if user_id not in user_selection:
-        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": duel_type, "opponent": opponent_id}
-    else:
-        user_selection[user_id]["duel_type"] = duel_type
-        user_selection[user_id]["opponent"] = opponent_id
-    
-    if invited:
-        await context.bot.send_message(opponent_id, "✅ Твой друг принял приглашение на дуэль! Выбирайте героев...")
-    
-    await show_hero_selection_for_duel(update, context, user_id, chat_id, duel_type)
-
-
 async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_type):
-    """Показывает выбор героев для дуэли"""
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
 
@@ -411,7 +432,15 @@ async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_t
 
     text = f"⚔️ *Выбор героев для дуэли*\n\nВыбери *3 героя*\nВыбрано: {len(selected)}/3\n\n⬜ — не выбран, ✅ — выбран\nВ скобках: множитель и шанс спасения\n👑x10 12% ⭐x4 9% 🔵x3 6% 📘x2 3%{bonus_text}"
 
-    await show_menu(update, context, user_id, chat_id, text, InlineKeyboardMarkup(keyboard))
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        print(f"❌ Ошибка отправки выбора героев: {e}")
 
 
 async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -445,6 +474,8 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         user_selection[user_id]["selected"] = selected
+        last_selection[user_id] = selected.copy()
+        
         await show_hero_selection_for_duel(update, context, user_id, chat_id, user_data.get("duel_type", "friend"))
 
     elif data.startswith("hpage|"):
@@ -479,6 +510,17 @@ async def start_duel_after_selection(update, context, user_id):
         return
 
     if opponent_id:
+        # Проверяем, выбрал ли соперник героев
+        opponent_data = user_selection.get(opponent_id, {})
+        opponent_selected = opponent_data.get("selected", [])
+        
+        if len(opponent_selected) != 3:
+            await context.bot.send_message(
+                user_id,
+                "⏳ Ожидаем выбора героев от соперника..."
+            )
+            return
+        
         p2_collection = get_collection(opponent_id)
         p2_keys = list(p2_collection.keys())
         if len(p2_keys) >= 3:
