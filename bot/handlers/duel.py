@@ -1,5 +1,3 @@
-# bot/handlers/duel.py
-
 import random
 import asyncio
 import hashlib
@@ -232,26 +230,17 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ У одного из игроков меньше 3 героев.")
         return
 
-    # Уведомляем пригласившего
+    # Инициализируем выбор героев для ОБОИХ игроков
+    user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": opponent_id}
+    user_selection[opponent_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
+
+    # Отправляем сообщение пригласившему
     await context.bot.send_message(
         opponent_id,
         f"✅ *{update.effective_user.first_name}* принял ваше приглашение на дуэль!\n\nВыбирайте героев..."
     )
 
-    # Запускаем выбор героев для ОБОИХ игроков
-    if user_id not in user_selection:
-        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": opponent_id}
-    else:
-        user_selection[user_id]["duel_type"] = "friend"
-        user_selection[user_id]["opponent"] = opponent_id
-    
-    if opponent_id not in user_selection:
-        user_selection[opponent_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
-    else:
-        user_selection[opponent_id]["duel_type"] = "friend"
-        user_selection[opponent_id]["opponent"] = user_id
-
-    # Отправляем выбор героев обоим игрокам
+    # ПОКАЗЫВАЕМ ВЫБОР ГЕРОЕВ ОБОИМ ИГРОКАМ
     await show_hero_selection_for_duel(update, context, user_id, query.message.chat_id, "friend")
     await show_hero_selection_for_duel(update, context, opponent_id, query.message.chat_id, "friend")
 
@@ -334,19 +323,11 @@ async def handle_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     invite_codes.pop(code, None)
     
-    # Запускаем выбор героев для ОБОИХ игроков
-    if user_id not in user_selection:
-        user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": inviter_id}
-    else:
-        user_selection[user_id]["duel_type"] = "friend"
-        user_selection[user_id]["opponent"] = inviter_id
-    
-    if inviter_id not in user_selection:
-        user_selection[inviter_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
-    else:
-        user_selection[inviter_id]["duel_type"] = "friend"
-        user_selection[inviter_id]["opponent"] = user_id
+    # Инициализируем выбор героев для ОБОИХ игроков
+    user_selection[user_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": inviter_id}
+    user_selection[inviter_id] = {"selected": [], "page": 0, "duel_type": "friend", "opponent": user_id}
 
+    # ПОКАЗЫВАЕМ ВЫБОР ГЕРОЕВ ОБОИМ ИГРОКАМ
     await show_hero_selection_for_duel(update, context, user_id, update.effective_chat.id, "friend")
     await show_hero_selection_for_duel(update, context, inviter_id, update.effective_chat.id, "friend")
 
@@ -369,9 +350,8 @@ async def duel_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_hero_selection_for_duel(update, context, user_id, chat_id, "bot")
 
 
-async def show_hero_selection_for_duel(update, update_context, user_id, chat_id, duel_type):
+async def show_hero_selection_for_duel(update, context, user_id, chat_id, duel_type):
     """Показывает выбор героев для дуэли"""
-    context = update_context
     collection = get_collection(user_id)
     hero_keys = list(collection.keys())
 
@@ -567,7 +547,6 @@ async def handle_hero_selection(update: Update, context: ContextTypes.DEFAULT_TY
     chat_id = query.message.chat_id
 
     if data == "hsel_last":
-        # Используем прошлый выбор
         if user_id in last_selection and len(last_selection[user_id]) == 3:
             user_selection[user_id]["selected"] = last_selection[user_id].copy()
             await query.edit_message_text("✅ Использован прошлый выбор героев!")
@@ -646,15 +625,8 @@ async def start_duel_after_selection(update, context, user_id):
             )
             return
         
-        p2_collection = get_collection(opponent_id)
-        p2_keys = list(p2_collection.keys())
-        if len(p2_keys) >= 3:
-            rarity_order = {"легендарный": 0, "эпический": 1, "редкий": 2, "обычный": 3}
-            sorted_keys = sorted(p2_keys, key=lambda k: rarity_order.get(p2_collection[k].get("rarity", "обычный"), 4))
-            p2_chosen = sorted_keys[:3]
-        else:
-            p2_chosen = random.sample(p2_keys, min(3, len(p2_keys)))
-        await start_duel(update, context, user_id, opponent_id, selected, p2_chosen)
+        # УБИРАЕМ лишнюю проверку и сразу начинаем дуэль
+        await start_duel(update, context, user_id, opponent_id, selected, opponent_selected)
         return
 
     user_selection.pop(user_id, None)
@@ -696,10 +668,12 @@ async def start_duel(update, context, user_id, opponent_id, p1_chosen, p2_chosen
     await ask_question(update, context, duel_id)
 
 
-async def start_bot_duel(update, update_context, user_id, p1_chosen):
-    context = update_context
+async def start_bot_duel(update, context, user_id, p1_chosen):
+    """Начинает дуэль с ботом - бот использует рандомных героев БЕЗ ОЖИДАНИЯ"""
     collection = get_collection(user_id)
     from ..models.hero import HEROES
+    
+    # Бот сразу выбирает 3 случайных героев (без ожидания)
     bot_heroes = random.sample(HEROES, 3)
 
     questions = get_weighted_questions(p1_chosen, collection, QUESTIONS, 5)
@@ -723,7 +697,9 @@ async def start_bot_duel(update, update_context, user_id, p1_chosen):
     p2_names = [h['name'] for h in bot_heroes]
 
     await context.bot.send_message(user_id,
-        f"🤖 *Дуэль с ботом началась!*\nТвои герои: {', '.join(p1_names)}\nГерои бота: {', '.join(p2_names)}\n🔄 Шанс спасения: {p1_save}%\n\n✅ Правильно → +1 очко тебе\n❌ Неправильно → +1 очко боту",
+        f"🤖 *Дуэль с ботом началась!*\nТвои герои: {', '.join(p1_names)}\nГерои бота: {', '.join(p2_names)}\n🔄 Шанс спасения: {p1_save}%\n\n"
+        f"✅ Правильно → +1 очко тебе\n❌ Неправильно → +1 очко боту\n"
+        f"🔄 Если ответишь неправильно, есть шанс спасения (макс 1 раз за дуэль)",
         parse_mode="Markdown")
 
     user_selection.pop(user_id, None)
@@ -731,6 +707,7 @@ async def start_bot_duel(update, update_context, user_id, p1_chosen):
 
 
 def get_bot_answer(question):
+    """Бот отвечает с вероятностью 70% правильно"""
     return question["correct"] if random.random() < 0.7 else random.choice([i for i in range(len(question["options"])) if i != question["correct"]])
 
 
@@ -745,8 +722,7 @@ async def ask_question(update, context, duel_id):
 
     q = duel["questions"][duel["turn"]]
     duel["question_active"] = True
-    duel["correct_answered"] = False
-    duel["p1_answered"] = False
+    duel["correct_answered"] = False    duel["p1_answered"] = False
     duel["p2_answered"] = False
     duel["waiting_for_answer"] = True
 
@@ -756,9 +732,50 @@ async def ask_question(update, context, duel_id):
     keyboard = [[InlineKeyboardButton(opt, callback_data=f"ans|{duel_id}|{i}")] for i, opt in enumerate(q["options"])]
     text = f"❓ *Вопрос {duel['turn'] + 1} из 5*\n\n{q['text']}{work_text}\n\n_Выбери вариант ответа:_"
 
+    # Отправляем вопрос игроку
     await context.bot.send_message(duel["player1"], text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-    if not duel.get("is_bot"):
+    
+    # Если дуэль с ботом - бот отвечает автоматически
+    if duel.get("is_bot"):
+        await handle_bot_answer(update, context, duel_id)
+    
+    # Если дуэль с другом - отправляем вопрос обоим
+    elif duel["player2"] != "bot":
         await context.bot.send_message(duel["player2"], text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def handle_bot_answer(update, context, duel_id):
+    """Бот отвечает на вопрос автоматически"""
+    duel = duels.get(duel_id)
+    if not duel or duel["status"] != "active":
+        return
+    
+    if duel.get("p2_answered"):
+        return
+    
+    if duel["turn"] >= len(duel["questions"]):
+        return
+    
+    q = duel["questions"][duel["turn"]]
+    
+    # Бот отвечает с вероятностью 70% правильно
+    bot_answer = get_bot_answer(q)
+    is_correct = bot_answer == q["correct"]
+    
+    duel["p2_answered"] = True
+    
+    if is_correct:
+        duel["p2_score"] += 1
+        await context.bot.send_message(duel["player1"], f"🤖 Бот ответил правильно! +1 очко боту.")
+    else:
+        await context.bot.send_message(duel["player1"], f"🤖 Бот ответил неправильно!")
+    
+    # Проверяем, ответил ли игрок
+    if duel.get("p1_answered"):
+        duel["correct_answered"] = True
+        duel["question_active"] = False
+        duel["waiting_for_answer"] = False
+        await send_correct_answer_and_continue(update, context, duel_id)
 
 
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -808,8 +825,15 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duel["question_active"] = False
         duel["waiting_for_answer"] = False
         await query.edit_message_text("✅ *Правильно!* +1 очко!", parse_mode="Markdown")
-        await send_correct_answer_and_continue(update, context, duel_id)
+        
+        # Проверяем, ответил ли соперник
+        if is_bot or duel.get(f"{opponent_key}_answered"):
+            await send_correct_answer_and_continue(update, context, duel_id)
+        else:
+            await context.bot.send_message(duel[opponent_key], f"👤 Соперник ответил правильно! Твой ход!")
+            
     else:
+        # Проверяем шанс спасения (макс 1 раз)
         save_chance = duel.get(f"{player_key}_save_chance", 0)
         save_used = duel.get(f"{player_key}_save_used", False)
 
@@ -820,26 +844,34 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             duel["waiting_for_answer"] = False
             duel[f"{player_key}_save_used"] = True
             await query.edit_message_text(f"🔄 *Спасение!*\nОтвет был неправильным, но герои спасли тебя! +1 очко! (шанс {save_chance}%)", parse_mode="Markdown")
-            await send_correct_answer_and_continue(update, context, duel_id)
+            
+            if is_bot or duel.get(f"{opponent_key}_answered"):
+                await send_correct_answer_and_continue(update, context, duel_id)
+            else:
+                await context.bot.send_message(duel[opponent_key], f"🔄 Соперник использовал спасение! Твой ход!")
             return
 
         await query.edit_message_text("❌ *Неправильно.*", parse_mode="Markdown")
 
+        # Если дуэль с ботом - бот получает очко
         if is_bot:
             duel["p2_score"] += 1
             duel["correct_answered"] = True
             duel["question_active"] = False
             duel["waiting_for_answer"] = False
             await context.bot.send_message(duel["player1"], "🤖 Бот получает +1 очко за твой неправильный ответ!")
-            await send_correct_answer_and_continue(update, context, duel_id)
-        elif duel.get(f"{opponent_key}_answered"):
-            duel["question_active"] = False
-            duel["waiting_for_answer"] = False
-            await send_correct_answer_and_continue(update, context, duel_id)
+            
+            if duel.get(f"{opponent_key}_answered"):
+                await send_correct_answer_and_continue(update, context, duel_id)
         else:
-            if not is_bot:
-                other_id = duel["player2"] if is_p1 else duel["player1"]
-                await context.bot.send_message(other_id, "🔔 Соперник ответил неправильно! Твой ход!")
+            # Если соперник уже ответил - переходим к следующему вопросу
+            if duel.get(f"{opponent_key}_answered"):
+                duel["correct_answered"] = True
+                duel["question_active"] = False
+                duel["waiting_for_answer"] = False
+                await send_correct_answer_and_continue(update, context, duel_id)
+            else:
+                await context.bot.send_message(duel[opponent_key], "🔔 Соперник ответил неправильно! Твой ход!")
 
 
 async def send_correct_answer_and_continue(update, context, duel_id):
@@ -892,16 +924,16 @@ async def finish_duel(update, context, duel_id):
         await context.bot.send_message(p1, f"🏆 *Ты победил!* +20 монет!\n{p1_score}:{p2_score}", parse_mode="Markdown")
     elif p2_score > p1_score:
         if is_bot:
-            await context.bot.send_message(p1, f"🤖 *Бот победил!* {p2_score}:{p1_score}", parse_mode="Markdown")
+            await context.bot.send_message(p1, f"🤖 *Бот победил!*\n{p2_score}:{p1_score}\n\nПопробуй ещё раз!", parse_mode="Markdown")
         else:
             add_coins(p2, 20)
             update_duel_stats(p2, True)
             update_duel_stats(p1, False)
             await context.bot.send_message(p2, f"🏆 *Ты победил!* +20 монет!\n{p2_score}:{p1_score}", parse_mode="Markdown")
-            await context.bot.send_message(p1, f"😔 *Ты проиграл.* {p2_score}:{p1_score}", parse_mode="Markdown")
+            await context.bot.send_message(p1, f"😔 *Ты проиграл.*\n{p2_score}:{p1_score}", parse_mode="Markdown")
     else:
         if is_bot:
-            await context.bot.send_message(p1, f"🤝 *Ничья с ботом!* {p1_score}:{p2_score}", parse_mode="Markdown")
+            await context.bot.send_message(p1, f"🤝 *Ничья с ботом!*\n{p1_score}:{p2_score}", parse_mode="Markdown")
         else:
             add_coins(p1, 5)
             add_coins(p2, 5)
