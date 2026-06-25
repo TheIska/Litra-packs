@@ -207,8 +207,12 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # БЕРЕМ ОПИСАНИЕ ПРЯМО ИЗ hero.py (из hero_info)
-        description = hero_info.get("description", f"📖 {hero_info['name']} — персонаж произведения «{hero_info['book']}» автора {hero_info['author']}.")
+        # БЕРЕМ ОПИСАНИЕ ИЗ hero.py (БЕЗ ЗАПАСНОГО ВАРИАНТА)
+        description = hero_info.get("description")
+        
+        # Если описания нет — пишем что отсутствует
+        if not description:
+            description = "⚠️ Описание отсутствует"
         
         if card:
             try:
