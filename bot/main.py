@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from .config import BOT_TOKEN
 from .database import init_db, migrate_db
@@ -40,7 +41,6 @@ from .handlers.duel import (
 )
 from .handlers.admin import add_coins_command
 from .handlers.quiz import quiz_command, quiz_answer_callback, stop_quiz_command
-from .web.server import keep_alive
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -50,7 +50,6 @@ logging.basicConfig(
 def main():
     init_db()
     migrate_db()
-    keep_alive()
 
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -89,32 +88,32 @@ def main():
     app.add_handler(CallbackQueryHandler(friends_menu, pattern="^friends_menu$"))
     app.add_handler(CallbackQueryHandler(friends_add_id, pattern="^friends_add_id$"))
     app.add_handler(CallbackQueryHandler(friends_invite, pattern="^friends_invite$"))
-    app.add_handler(CallbackQueryHandler(copy_invite, pattern="^copy_invite\|"))
-    app.add_handler(CallbackQueryHandler(share_invite, pattern="^share_invite\|"))
+    app.add_handler(CallbackQueryHandler(copy_invite, pattern="^copy_invite\\|"))
+    app.add_handler(CallbackQueryHandler(share_invite, pattern="^share_invite\\|"))
     app.add_handler(CallbackQueryHandler(friends_from_list, pattern="^friends_from_list$"))
-    app.add_handler(CallbackQueryHandler(friends_add_from_list, pattern="^friends_add_from_list\|"))
+    app.add_handler(CallbackQueryHandler(friends_add_from_list, pattern="^friends_add_from_list\\|"))
 
     # ========== ДУЭЛИ ==========
     app.add_handler(CallbackQueryHandler(duel_command, pattern="^duel$"))
     app.add_handler(CallbackQueryHandler(duel_friends, pattern="^duel_friends$"))
-    app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\|"))
+    app.add_handler(CallbackQueryHandler(duel_friend_select, pattern="^duel_friend_select\\|"))
     app.add_handler(CallbackQueryHandler(duel_bot, pattern="^duel_bot$"))
-    app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\|"))
+    app.add_handler(CallbackQueryHandler(duel_accept, pattern="^duel_accept\\|"))
     app.add_handler(CallbackQueryHandler(duel_decline, pattern="^duel_decline$"))
     
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\|"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\|"))
-    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^f\|"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^ans\\|"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^b\\|"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern="^f\\|"))
     
     # ========== ВЫБОР ГЕРОЕВ ==========
-    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hsel\|"))
-    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hpage\|"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hsel\\|"))
+    app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^hpage\\|"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^startduel$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
 
     # ========== ВИКТОРИНА ==========
-    app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\|"))
+    app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\\|"))
 
     # ========== ВВОД ДЛЯ ДРУЗЕЙ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_friend))
@@ -123,7 +122,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
 
     print("🤖 Бот запущен!")
-    app.run_polling()
+    asyncio.run(app.run_polling())
 
 if __name__ == "__main__":
     main()

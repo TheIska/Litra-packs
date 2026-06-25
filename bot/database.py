@@ -1,4 +1,4 @@
-# bot/database.py
+# bot/database.py - полный код с системой друзей
 
 import sqlite3
 import json
@@ -50,6 +50,18 @@ def init_db():
         )
     ''')
     
+    # Таблица друзей
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS friends (
+            user_id INTEGER,
+            friend_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, friend_id),
+            FOREIGN KEY(user_id) REFERENCES users(user_id),
+            FOREIGN KEY(friend_id) REFERENCES users(user_id)
+        )
+    ''')
+    
     conn.commit()
     conn.close()
     print(f"✅ База данных инициализирована: {DB_PATH}")
@@ -82,6 +94,23 @@ def migrate_db():
     if "card_number" not in collection_columns:
         c.execute("ALTER TABLE collection ADD COLUMN card_number INTEGER DEFAULT 0")
         print("✅ Добавлена колонка card_number в collection")
+    
+    # Проверяем колонки friends
+    c.execute("PRAGMA table_info(friends)")
+    friends_columns = [col[1] for col in c.fetchall()]
+    
+    if not friends_columns:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS friends (
+                user_id INTEGER,
+                friend_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, friend_id),
+                FOREIGN KEY(user_id) REFERENCES users(user_id),
+                FOREIGN KEY(friend_id) REFERENCES users(user_id)
+            )
+        ''')
+        print("✅ Создана таблица friends")
     
     conn.commit()
     conn.close()
@@ -348,7 +377,6 @@ def get_card_by_number(user_id: int, number: int) -> Optional[Dict]:
     """, (user_id, number))
     row = c.fetchone()
     conn.close()
-    print(f"🔍 get_card_by_number: user={user_id}, number={number}, found={row is not None}")
     if row:
         hero = json.loads(row[0])
         hero['card_number'] = row[2] or 0
@@ -380,5 +408,72 @@ def reset_user_data(user_id: int) -> None:
     c = conn.cursor()
     c.execute("DELETE FROM collection WHERE user_id = ?", (user_id,))
     c.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+    c.execute("DELETE FROM friends WHERE user_id = ? OR friend_id = ?", (user_id, user_id))
     conn.commit()
     conn.close()
+
+# ==================== ФУНКЦИИ ДЛЯ ДРУЗЕЙ ====================
+
+def add_friend(user_id: int, friend_id: int) -> bool:
+    """Добавляет друга в список"""
+    if user_id == friend_id:
+        return False
+    
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT OR IGNORE INTO friends (user_id, friend_id) VALUES (?, ?)",
+            (user_id, friend_id)
+        )
+        c.execute(
+            "INSERT OR IGNORE INTO friends (user_id, friend_id) VALUES (?, ?)",
+            (friend_id, user_id)
+        )
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
+def remove_friend(user_id: int, friend_id: int) -> bool:
+    """Удаляет друга из списка"""
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute(
+            "DELETE FROM friends WHERE user_id = ? AND friend_id = ?",
+            (user_id, friend_id)
+        )
+        c.execute(
+            "DELETE FROM friends WHERE user_id = ? AND friend_id = ?",
+            (friend_id, user_id)
+        )
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
+def get_friends(user_id: int) -> list:
+    """Возвращает список друзей пользователя"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT friend_id FROM friends WHERE user_id = ?", (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
+
+def is_friend(user_id: int, friend_id: int) -> bool:
+    """Проверяет, являются ли пользователи друзьями"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?",
+        (user_id, friend_id)
+    )
+    result = c.fetchone() is not None
+    conn.close()
+    return result
