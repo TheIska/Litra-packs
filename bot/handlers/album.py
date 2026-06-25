@@ -186,19 +186,8 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         number = int(query.data.split("_")[2])
         print(f"🔍 Номер карты: {number}")
         
-        collection = get_collection(user_id)
-        
-        card = None
-        for hero in collection.values():
-            if hero.get('card_number', 0) == number:
-                card = hero
-                break
-        
-        # БЕРЁМ ГЕРОЯ ИЗ hero.py ПО НОМЕРУ
+        # БЕРЁМ ГЕРОЯ ИЗ hero.py ПО НОМЕРУ (НЕ ИЗ БД!)
         hero_info = HEROES_BY_NUMBER.get(number)
-        
-        print(f"📊 card из БД: {card is not None}")
-        print(f"📊 hero_info: {hero_info.get('name') if hero_info else None}")
         
         if not hero_info:
             await context.bot.send_message(
@@ -207,12 +196,16 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # БЕРЕМ ОПИСАНИЕ ИЗ hero.py
-        description = hero_info.get("description")
+        # БЕРЕМ ОПИСАНИЕ ИЗ hero.py (НЕ ИЗ БД!)
+        description = hero_info.get("description", "⚠️ Описание отсутствует")
         
-        # Если описания нет — пишем что отсутствует
-        if not description:
-            description = "⚠️ Описание отсутствует"
+        # Проверяем, есть ли карта в коллекции (только для статуса)
+        collection = get_collection(user_id)
+        card = None
+        for hero in collection.values():
+            if hero.get('card_number', 0) == number:
+                card = hero
+                break
         
         if card:
             try:
