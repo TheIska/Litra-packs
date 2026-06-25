@@ -113,7 +113,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_hero_selection, pattern="^noop$"))
 
     # ========== ВИКТОРИНА ==========
-    app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans\\|"))
+    app.add_handler(CallbackQueryHandler(quiz_answer_callback, pattern="^qans_"))
+    app.add_handler(CallbackQueryHandler(stop_quiz_command, pattern="^stop_quiz$"))
 
     # ========== ВВОД ДЛЯ ДРУЗЕЙ ==========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_friend))
