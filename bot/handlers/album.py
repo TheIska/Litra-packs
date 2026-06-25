@@ -207,7 +207,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # БЕРЕМ ОПИСАНИЕ ИЗ hero.py (БЕЗ ЗАПАСНОГО ВАРИАНТА)
+        # БЕРЕМ ОПИСАНИЕ ИЗ hero.py
         description = hero_info.get("description")
         
         # Если описания нет — пишем что отсутствует
