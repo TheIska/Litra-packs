@@ -194,11 +194,8 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
                 card = hero
                 break
         
-        hero_info = None
-        for num, hero in HEROES_BY_NUMBER.items():
-            if num == number:
-                hero_info = hero
-                break
+        # БЕРЁМ ГЕРОЯ ИЗ hero.py ПО НОМЕРУ
+        hero_info = HEROES_BY_NUMBER.get(number)
         
         print(f"📊 card из БД: {card is not None}")
         print(f"📊 hero_info: {hero_info.get('name') if hero_info else None}")
@@ -210,7 +207,7 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # БЕРЕМ ОПИСАНИЕ ПРЯМО ИЗ hero_info (из hero.py)
+        # БЕРЕМ ОПИСАНИЕ ПРЯМО ИЗ hero.py (из hero_info)
         description = hero_info.get("description", f"📖 {hero_info['name']} — персонаж произведения «{hero_info['book']}» автора {hero_info['author']}.")
         
         if card:
