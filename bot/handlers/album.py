@@ -3,7 +3,6 @@ from telegram.ext import ContextTypes
 from ..database import get_collection
 from ..models.hero import HEROES_BY_NUMBER, get_total_heroes
 from ..utils.image_generator import create_hero_card
-from ..utils.gigachat_description import generate_description_for_hero
 import logging
 import traceback
 
@@ -211,13 +210,8 @@ async def show_card_by_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Генерируем описание через GigaChat
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="⏳ Генерирую описание героя через ИИ..."
-        )
-        
-        description = await generate_description_for_hero(hero_info)
+        # БЕРЕМ ОПИСАНИЕ ПРЯМО ИЗ hero_info (из hero.py)
+        description = hero_info.get("description", f"📖 {hero_info['name']} — персонаж произведения «{hero_info['book']}» автора {hero_info['author']}.")
         
         if card:
             try:
