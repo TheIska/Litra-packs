@@ -1,13 +1,8 @@
-# bot/handlers/start.py
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..database import get_user, get_collection
 from ..friends import get_friends, add_friend, is_friend, get_user_by_id
 from datetime import datetime, timedelta
-import hashlib
-import time
-import random
 
 ADMIN_ID = 6082384471
 
@@ -106,12 +101,10 @@ async def friends_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text += "\n💡 **Как добавить друзей:**\n"
     text += "• По ID (если знаете)\n"
-    text += "• По ссылке-приглашению\n"
     text += "• Из списка игроков"
     
     keyboard = [
         [InlineKeyboardButton("➕ По ID", callback_data="friends_add_id")],
-        [InlineKeyboardButton("🔗 По ссылке", callback_data="friends_invite")],
         [InlineKeyboardButton("📋 Из списка игроков", callback_data="friends_from_list")],
         [InlineKeyboardButton("⚔️ Дуэль с другом", callback_data="duel_friends")],
         [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")],
@@ -218,112 +211,6 @@ async def friends_add_from_list(update: Update, context: ContextTypes.DEFAULT_TY
         )
     else:
         await query.edit_message_text("❌ Ошибка при добавлении друга.")
-
-
-async def friends_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    bot_username = (await context.bot.get_me()).username
-    
-    raw = f"{user_id}_{time.time()}_{random.randint(1000,9999)}"
-    code = hashlib.md5(raw.encode()).hexdigest()[:8].upper()
-    
-    context.user_data['invite_code'] = code
-    context.user_data['invite_time'] = time.time()
-    context.user_data['inviter_id'] = user_id
-    
-    invite_link = f"https://t.me/{bot_username}?start=friend_{code}"
-    
-    text = (
-        "🔗 **Пригласить друга**\n\n"
-        "Отправь другу ссылку-приглашение:\n"
-        f"`{invite_link}`\n\n"
-        "⚠️ Ссылка действует *5 минут*"
-    )
-    keyboard = [
-        [InlineKeyboardButton("📋 Копировать ссылку", callback_data=f"copy_invite|{invite_link}")],
-        [InlineKeyboardButton("📤 Поделиться", callback_data=f"share_invite|{invite_link}")],
-        [InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")],
-    ]
-    
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-
-async def copy_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    link = query.data.split("|")[1]
-    await query.edit_message_text(
-        f"🔗 Ссылка скопирована! Отправь другу:\n\n`{link}`\n\n⚠️ Ссылка действует 5 минут.",
-        parse_mode="Markdown"
-    )
-
-
-async def share_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    link = query.data.split("|")[1]
-    keyboard = [
-        [InlineKeyboardButton("📋 Копировать ссылку", callback_data=f"copy_invite|{link}")],
-        [InlineKeyboardButton("🔙 Назад", callback_data="friends_menu")],
-    ]
-    text = f"🔗 *Поделись ссылкой с другом:*\n\n`{link}`\n\nИли отправь текст:\n*Привет! Давай добавимся в друзья в боте «Литературный Герой»!*\nПерейди по ссылке: {link}"
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-async def handle_friend_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args or not context.args[0].startswith("friend_"):
-        return
-
-    code = context.args[0].replace("friend_", "")
-    user_id = update.effective_user.id
-    
-    if context.user_data.get('invite_code') != code:
-        await update.message.reply_text("❌ Недействительная ссылка-приглашение.")
-        return
-    
-    if time.time() - context.user_data.get('invite_time', 0) > 300:
-        await update.message.reply_text("❌ Ссылка истекла (5 минут).")
-        return
-    
-    inviter_id = context.user_data.get('inviter_id')
-    if not inviter_id:
-        await update.message.reply_text("❌ Ошибка: не найден пригласивший.")
-        return
-    
-    if user_id == inviter_id:
-        await update.message.reply_text("❌ Нельзя пригласить самого себя!")
-        return
-    
-    if is_friend(user_id, inviter_id):
-        await update.message.reply_text("✅ Вы уже друзья!")
-        return
-    
-    if add_friend(user_id, inviter_id):
-        try:
-            chat = await context.bot.get_chat(inviter_id)
-            name = chat.first_name or "Пользователь"
-        except:
-            name = f"ID {inviter_id}"
-        
-        await update.message.reply_text(f"✅ *{name}* добавлен в список друзей!", parse_mode="Markdown")
-        
-        try:
-            await context.bot.send_message(
-                chat_id=inviter_id,
-                text=f"✅ *{update.effective_user.first_name}* принял ваше приглашение и стал вашим другом!",
-                parse_mode="Markdown"
-            )
-        except:
-            pass
-    else:
-        await update.message.reply_text("❌ Ошибка при добавлении друга.")
 
 
 async def handle_add_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):

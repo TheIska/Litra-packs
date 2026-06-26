@@ -4,14 +4,13 @@ from ..database import get_user, update_user, add_coins
 from ..models.questions import QUESTIONS
 import random
 import datetime
-import asyncio  # ДОБАВЛЕН ИМПОРТ
+import asyncio
 
 # Хранилище активных викторин
 active_quizzes = {}
-
-# Правильные ответы за викторину (для начисления монет)
 quiz_answers = {}
-QUIZ_QUESTIONS_COUNT = 5  # Количество вопросов за викторину
+QUIZ_QUESTIONS_COUNT = 5
+
 
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Запускает викторину"""
@@ -29,7 +28,6 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         chat_id = update.effective_chat.id
         message_id = None
 
-    # Проверяем, есть ли уже активная викторина
     if user_id in active_quizzes:
         text = "⏳ У тебя уже есть активная викторина! Отвечай на вопросы."
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")]])
@@ -42,24 +40,55 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(text, reply_markup=keyboard)
         return
 
-    # Проверяем ежедневный бонус
     user = get_user(user_id)
     today = datetime.datetime.now().date().isoformat()
     last_date = user.get("daily_quiz_last_date")
     
-    # Сбрасываем daily_quiz_done, если прошёл день
+    # Проверяем, не пропустил ли пользователь день
+    if last_date:
+        last_date_obj = datetime.datetime.strptime(last_date, "%Y-%m-%d").date()
+        today_obj = datetime.datetime.now().date()
+        days_diff = (today_obj - last_date_obj).days
+        
+        # Если пропустил хотя бы 1 день — сбрасываем серию
+        if days_diff > 1:
+            update_user(user_id, daily_quiz_streak=0, daily_quiz_done=0)
+            user = get_user(user_id)
+        elif days_diff == 1 and user.get("daily_quiz_done", 0) == 0:
+            # Если вчера не играл — сбрасываем серию
+            update_user(user_id, daily_quiz_streak=0)
+            user = get_user(user_id)
+    
+    # Если новый день — сбрасываем счётчик бонусов
     if last_date and last_date != today:
-        update_user(user_id, daily_quiz_done=0, daily_quiz_streak=0)
+        update_user(user_id, daily_quiz_done=0)
         user = get_user(user_id)
     
+    # Если серия сброшена — уведомляем
+    streak = user.get("daily_quiz_streak", 0)
+    if streak == 0 and last_date and last_date != today:
+        # Показываем уведомление только если был перерыв
+        pass
+
+    bonus_count = user.get("daily_quiz_done", 0)
+    streak = user.get("daily_quiz_streak", 0)
+    
+    # Рассчитываем награду за день (50 + 10 * streak, но не больше 100)
+    daily_reward = min(50 + streak * 10, 100)
+
     # Проверяем, получал ли уже бонус сегодня
-    if user.get("daily_quiz_done", 0) >= 5:
+    if bonus_count >= 5:
         text = (
-            "✅ Ты уже получил все бонусы за сегодня (5 раз по 50 монет)!\n"
-            f"💰 Твой баланс: {user['coins']} монет\n\n"
+            f"✅ Ты уже получил все 5 бонусов за сегодня!\n"
+            f"💰 Твой баланс: {user['coins']} монет\n"
+            f"🔥 Серия: {streak} дней\n"
+            f"💎 Награда за следующий день: {min(daily_reward + 10, 100)} монет\n\n"
             "Завтра в 00:00 бонусы обновятся! 🎉"
         )
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Играть без бонусов", callback_data="quiz")],
+            [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]
+        ])
         if query:
             try:
                 await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
@@ -69,13 +98,8 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
         return
 
-    # Проверяем, сколько бонусов уже получено сегодня
-    bonus_count = user.get("daily_quiz_done", 0)
-
-    # Перемешиваем вопросы
     questions = random.sample(QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUESTIONS)))
     
-    # Сохраняем состояние викторины
     quiz_data = {
         "questions": questions,
         "current": 0,
@@ -84,12 +108,13 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "bonus_count": bonus_count,
         "user_id": user_id,
         "chat_id": chat_id,
-        "message_id": message_id
+        "message_id": message_id,
+        "daily_reward": daily_reward,
+        "streak": streak
     }
     active_quizzes[user_id] = quiz_data
     quiz_answers[user_id] = 0
 
-    # Отправляем первый вопрос
     await send_question(update, context, user_id, chat_id)
 
 
@@ -111,22 +136,30 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user
     options = question_data["options"]
     correct = question_data["correct"]
 
-    # Сохраняем правильный ответ для проверки
     quiz["correct"] = correct
 
-    # Создаём клавиатуру
     keyboard = []
     for i, option in enumerate(options):
         keyboard.append([InlineKeyboardButton(option, callback_data=f"qans_{user_id}_{i}")])
 
     keyboard.append([InlineKeyboardButton("❌ Завершить", callback_data="stop_quiz")])
 
+    user = get_user(user_id)
+    bonus_left = 5 - user.get("daily_quiz_done", 0)
+    streak = user.get("daily_quiz_streak", 0)
+    daily_reward = min(50 + streak * 10, 100)
+    
     text_message = (
         f"📝 *Вопрос {current + 1}/{total}*\n\n"
         f"{text}\n\n"
-        f"💰 Бонус за правильный ответ: *50 монет*\n"
-        f"📊 Осталось бонусов за сегодня: *{5 - quiz['bonus_count']}*"
+        f"💰 Награда за правильный ответ: *{daily_reward} монет*\n"
+        f"🔥 Серия: *{streak}* дней\n"
     )
+    
+    if bonus_left > 0:
+        text_message += f"📊 Осталось бонусов за сегодня: *{bonus_left}*"
+    else:
+        text_message += f"📊 Все бонусы получены, но играй дальше! 🎉"
 
     try:
         if update.callback_query:
@@ -183,7 +216,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
         return
 
-    # Проверяем, что викторина активна
     quiz = active_quizzes.get(user_id)
     if not quiz:
         try:
@@ -195,70 +227,73 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
         return
 
-    # Проверяем, что ответ правильный
     correct = quiz.get("correct")
     is_correct = (answer_idx == correct)
     
-    # Получаем данные пользователя
     user = get_user(user_id)
     today = datetime.datetime.now().date().isoformat()
     
-    # Проверяем дату
+    # Проверяем, не пропустил ли пользователь день
+    last_date = user.get("daily_quiz_last_date")
+    if last_date:
+        last_date_obj = datetime.datetime.strptime(last_date, "%Y-%m-%d").date()
+        today_obj = datetime.datetime.now().date()
+        days_diff = (today_obj - last_date_obj).days
+        
+        if days_diff > 1:
+            update_user(user_id, daily_quiz_streak=0, daily_quiz_done=0)
+            user = get_user(user_id)
+        elif days_diff == 1 and user.get("daily_quiz_done", 0) == 0:
+            update_user(user_id, daily_quiz_streak=0)
+            user = get_user(user_id)
+    
     if user.get("daily_quiz_last_date") != today:
-        update_user(user_id, daily_quiz_done=0, daily_quiz_streak=0)
+        update_user(user_id, daily_quiz_done=0)
         user = get_user(user_id)
     
-    # Проверяем, не исчерпан ли лимит бонусов
-    if user.get("daily_quiz_done", 0) >= 5:
-        try:
-            await query.edit_message_text(
-                "✅ Ты уже получил все бонусы за сегодня!\n"
-                "Завтра в 00:00 бонусы обновятся. 🎉",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
-            )
-        except:
-            pass
-        del active_quizzes[user_id]
-        return
-
-    # Если ответ правильный и есть бонусы
+    bonus_count = user.get("daily_quiz_done", 0)
+    streak = user.get("daily_quiz_streak", 0)
+    daily_reward = min(50 + streak * 10, 100)
+    
     if is_correct:
-        # Начисляем 50 монет
-        add_coins(user_id, 50)
-        
-        # Обновляем счётчик бонусов
-        new_done = user.get("daily_quiz_done", 0) + 1
-        update_user(user_id, 
-                    daily_quiz_done=new_done,
-                    daily_quiz_last_date=today,
-                    daily_quiz_streak=user.get("daily_quiz_streak", 0) + 1)
-        
-        # Обновляем quiz_data
-        quiz["bonus_count"] = new_done
-        
-        # Сообщаем о начислении
-        try:
+        if bonus_count < 5:
+            # Начисляем прогрессивную награду
+            add_coins(user_id, daily_reward)
+            new_done = bonus_count + 1
+            new_streak = streak + 1
+            update_user(user_id, 
+                        daily_quiz_done=new_done,
+                        daily_quiz_last_date=today,
+                        daily_quiz_streak=new_streak)
+            quiz["bonus_count"] = new_done
+            
+            next_reward = min(50 + new_streak * 10, 100)
             await query.edit_message_text(
-                f"✅ *Правильно!* +50 монет! 💰\n\n"
+                f"✅ *Правильно!* +{daily_reward} монет! 💰\n\n"
                 f"📊 Получено бонусов сегодня: {new_done}/5\n"
-                f"💰 Твой баланс: {user['coins'] + 50} монет",
+                f"🔥 Серия: {new_streak} дней\n"
+                f"💎 Завтрашняя награда: {next_reward} монет\n"
+                f"💰 Твой баланс: {user['coins'] + daily_reward} монет",
                 parse_mode="Markdown"
             )
-        except:
-            pass
+        else:
+            await query.edit_message_text(
+                f"✅ *Правильно!* 🎉\n\n"
+                f"📊 Ты уже получил все 5 бонусов за сегодня!\n"
+                f"🔥 Серия: {streak} дней\n"
+                f"💰 Твой баланс: {user['coins']} монет\n\n"
+                "Продолжай играть! 🚀",
+                parse_mode="Markdown"
+            )
         await asyncio.sleep(1)
     else:
-        try:
-            await query.edit_message_text(
-                f"❌ *Неправильно.*\n\n"
-                f"Правильный ответ: {quiz['questions'][quiz['current']]['options'][correct]}",
-                parse_mode="Markdown"
-            )
-        except:
-            pass
+        await query.edit_message_text(
+            f"❌ *Неправильно.*\n\n"
+            f"Правильный ответ: {quiz['questions'][quiz['current']]['options'][correct]}",
+            parse_mode="Markdown"
+        )
         await asyncio.sleep(1.5)
 
-    # Переходим к следующему вопросу
     quiz["current"] += 1
     
     if quiz["current"] >= quiz["total"]:
@@ -276,10 +311,14 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
         return
     
     user = get_user(user_id)
+    streak = user.get("daily_quiz_streak", 0)
+    next_reward = min(50 + streak * 10, 100)
     
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Начать новую викторину", callback_data="quiz")],
+        [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]
+    ])
     
-    # Проверяем, все ли бонусы получены
     done = user.get("daily_quiz_done", 0)
     
     if done >= 5:
@@ -287,17 +326,19 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
             f"🎉 *Викторина завершена!*\n\n"
             f"💰 Ты получил все *5 бонусов* за сегодня!\n"
             f"📊 Всего монет: *{user['coins']}*\n"
-            f"🔥 Серия: *{user.get('daily_quiz_streak', 0)}* дней\n\n"
-            "Завтра в 00:00 бонусы обновятся!"
+            f"🔥 Серия: *{streak}* дней\n"
+            f"💎 Завтрашняя награда: *{next_reward} монет*\n\n"
+            "🔄 Можешь продолжать играть, но бонусы будут завтра!"
         )
     else:
         text = (
             f"🎉 *Викторина завершена!*\n\n"
             f"💰 Ты получил *{done}* бонусов из 5 сегодня\n"
             f"📊 Всего монет: *{user['coins']}*\n"
-            f"🔥 Серия: *{user.get('daily_quiz_streak', 0)}* дней\n\n"
+            f"🔥 Серия: *{streak}* дней\n"
+            f"💎 Завтрашняя награда: *{next_reward} монет*\n\n"
             f"💡 Осталось бонусов: *{5 - done}*\n"
-            "Чтобы получить их, начни новую викторину!"
+            "Начни новую викторину, чтобы получить их!"
         )
     
     try:
@@ -342,7 +383,10 @@ async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         quiz_answers.pop(user_id, None)
         
         text = "⏹️ *Викторина завершена!*"
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Начать новую", callback_data="quiz")],
+            [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]
+        ])
         
         try:
             if query:
@@ -353,7 +397,10 @@ async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await context.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="Markdown")
     else:
         text = "❌ У тебя нет активной викторины."
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Начать викторину", callback_data="quiz")],
+            [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]
+        ])
         try:
             if query:
                 await query.edit_message_text(text, reply_markup=keyboard)

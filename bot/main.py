@@ -15,10 +15,6 @@ from .handlers.start import (
     id_command,
     friends_menu,
     friends_add_id,
-    friends_invite,
-    copy_invite,
-    share_invite,
-    handle_friend_invite,
     friends_from_list,
     friends_add_from_list,
     handle_add_friend,
@@ -81,7 +77,6 @@ def main():
 
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("start", handle_friend_invite))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("duel", duel_command))
@@ -120,9 +115,6 @@ def main():
     # ========== ДРУЗЬЯ ==========
     app.add_handler(CallbackQueryHandler(friends_menu, pattern="^friends_menu$"))
     app.add_handler(CallbackQueryHandler(friends_add_id, pattern="^friends_add_id$"))
-    app.add_handler(CallbackQueryHandler(friends_invite, pattern="^friends_invite$"))
-    app.add_handler(CallbackQueryHandler(copy_invite, pattern="^copy_invite\\|"))
-    app.add_handler(CallbackQueryHandler(share_invite, pattern="^share_invite\\|"))
     app.add_handler(CallbackQueryHandler(friends_from_list, pattern="^friends_from_list$"))
     app.add_handler(CallbackQueryHandler(friends_add_from_list, pattern="^friends_add_from_list\\|"))
 
