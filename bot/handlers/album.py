@@ -514,13 +514,19 @@ async def sell_duplicates_all(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
     ]
     
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    try:
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            await query.answer("Уже на этой странице")
+        else:
+            raise e
 
 
 async def sell_duplicates_all_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Подтверждение продажи всех дубликатов"""
     query = update.callback_query
-    # НЕ ДЕЛАЕМ await query.answer() ЗДЕСЬ, ЧТОБЫ НЕ БЛОКИРОВАТЬ
+    # НЕ ДЕЛАЕМ await query.answer() — это блокирует
     
     user_id = update.effective_user.id
     
@@ -580,7 +586,7 @@ async def sell_duplicates_all_confirm(update: Update, context: ContextTypes.DEFA
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         if "Message is not modified" in str(e):
-            pass
+            pass  # Игнорируем
         else:
             raise e
 
