@@ -8,7 +8,7 @@ import asyncio
 
 active_quizzes = {}
 quiz_answers = {}
-QUIZ_QUESTIONS_COUNT = 5
+QUIZ_QUESTIONS_COUNT = 5  # Показываем по 5 вопросов за раз, но после них идут новые
 
 
 def declension_days(count):
@@ -54,7 +54,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     today = datetime.datetime.now().date().isoformat()
     last_date = user.get("daily_quiz_last_date")
     
-    # Проверяем серию — увеличиваем ТОЛЬКО если играл вчера
+    # Проверяем серию
     streak = user.get("daily_quiz_streak", 0)
     
     if last_date:
@@ -62,52 +62,25 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         today_obj = datetime.datetime.now().date()
         days_diff = (today_obj - last_date_obj).days
         
-        # Если пропустил день — сбрасываем серию
         if days_diff > 1:
             update_user(user_id, daily_quiz_streak=0)
             user = get_user(user_id)
             streak = 0
         elif days_diff == 1:
-            # Играл вчера — серия увеличивается на 1
             new_streak = streak + 1
             update_user(user_id, daily_quiz_streak=new_streak)
             user = get_user(user_id)
             streak = new_streak
     
-    # Если новый день — сбрасываем счётчик бонусов
     if last_date and last_date != today:
         update_user(user_id, daily_quiz_done=0)
         user = get_user(user_id)
     
     bonus_count = user.get("daily_quiz_done", 0)
     streak = user.get("daily_quiz_streak", 0)
-    
-    # Рассчитываем награду за день (50 + 10 * streak, но не больше 100)
     daily_reward = min(50 + streak * 10, 100)
 
-    # Проверяем, получал ли уже бонус сегодня
-    if bonus_count >= 5:
-        days_word = declension_days(streak)
-        text = (
-            f"✅ Ты уже получил все 5 бонусов за сегодня!\n"
-            f"💰 Твой баланс: {user['coins']} монет\n"
-            f"🔥 Серия: {streak} {days_word}\n"
-            f"💎 Награда за следующий день: {min(daily_reward + 10, 100)} монет\n\n"
-            "Завтра в 00:00 бонусы обновятся! 🎉"
-        )
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Играть без бонусов", callback_data="quiz")],
-            [InlineKeyboardButton("🔙 На главную", callback_data="main_menu")]
-        ])
-        if query:
-            try:
-                await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
-            except:
-                await context.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="Markdown")
-        else:
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
-        return
-
+    # БЕСКОНЕЧНАЯ ВИКТОРИНА — вопросы генерируются на лету
     questions = random.sample(QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUESTIONS)))
     
     quiz_data = {
@@ -120,7 +93,8 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "chat_id": chat_id,
         "message_id": message_id,
         "daily_reward": daily_reward,
-        "streak": streak
+        "streak": streak,
+        "question_number": 0,  # Общий счётчик вопросов
     }
     active_quizzes[user_id] = quiz_data
     quiz_answers[user_id] = 0
@@ -135,10 +109,17 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user
 
     current = quiz["current"]
     total = quiz["total"]
+    question_number = quiz.get("question_number", 0) + 1
+    quiz["question_number"] = question_number
     
+    # Если закончились вопросы — генерируем новые
     if current >= total:
-        await finish_quiz(update, context, user_id)
-        return
+        new_questions = random.sample(QUESTIONS, min(QUIZ_QUESTIONS_COUNT, len(QUESTIONS)))
+        quiz["questions"] = new_questions
+        quiz["current"] = 0
+        quiz["total"] = len(new_questions)
+        current = 0
+        total = len(new_questions)
 
     question_data = quiz["questions"][current]
     text = question_data["text"]
@@ -160,7 +141,7 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user
     days_word = declension_days(streak)
     
     text_message = (
-        f"📝 *Вопрос {current + 1}/{total}*\n\n"
+        f"📝 *Вопрос {question_number}*\n\n"
         f"{text}\n\n"
         f"💰 Награда за правильный ответ: *{daily_reward} монет*\n"
         f"🔥 Серия: *{streak} {days_word}*\n"
@@ -233,7 +214,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     user = get_user(user_id)
     today = datetime.datetime.now().date().isoformat()
     
-    # Проверяем дату для серии
     last_date = user.get("daily_quiz_last_date")
     if last_date:
         last_date_obj = datetime.datetime.strptime(last_date, "%Y-%m-%d").date()
@@ -243,7 +223,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if days_diff > 1:
             update_user(user_id, daily_quiz_streak=0)
             user = get_user(user_id)
-        # Серия увеличивается в quiz_command, а не здесь
     
     if user.get("daily_quiz_last_date") != today:
         update_user(user_id, daily_quiz_done=0)
@@ -261,7 +240,6 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                         daily_quiz_done=new_done,
                         daily_quiz_last_date=today)
             
-            next_reward = min(50 + streak * 10, 100)
             days_word = declension_days(streak)
             
             await query.edit_message_text(
@@ -289,15 +267,13 @@ async def quiz_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         await asyncio.sleep(1.5)
 
+    # Переходим к следующему вопросу
     quiz["current"] += 1
-    
-    if quiz["current"] >= quiz["total"]:
-        await finish_quiz(update, context, user_id)
-    else:
-        await send_question(update, context, user_id, query.message.chat_id)
+    await send_question(update, context, user_id, query.message.chat_id)
 
 
 async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
+    """Завершает викторину (вызывается только при /stopquiz)"""
     quiz = active_quizzes.pop(user_id, None)
     quiz_answers.pop(user_id, None)
     
@@ -351,6 +327,7 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
 
 
 async def stop_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Останавливает текущую викторину"""
     query = update.callback_query
     
     if query:

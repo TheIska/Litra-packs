@@ -5,7 +5,6 @@ from ..models.hero import HEROES_BY_NUMBER, get_total_heroes
 from ..utils.image_generator import create_hero_card
 import logging
 import traceback
-import json
 import sqlite3
 import asyncio
 
@@ -515,22 +514,13 @@ async def sell_duplicates_all(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
     ]
     
-    try:
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-    except Exception as e:
-        if "Message is not modified" in str(e):
-            await query.answer("Уже на этой странице")
-        else:
-            raise e
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
 async def sell_duplicates_all_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Подтверждение продажи всех дубликатов"""
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception as e:
-        print(f"❌ Ошибка при answer: {e}")
+    # НЕ ДЕЛАЕМ await query.answer() ЗДЕСЬ, ЧТОБЫ НЕ БЛОКИРОВАТЬ
     
     user_id = update.effective_user.id
     
@@ -590,7 +580,7 @@ async def sell_duplicates_all_confirm(update: Update, context: ContextTypes.DEFA
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         if "Message is not modified" in str(e):
-            await query.answer("Уже на этой странице")
+            pass
         else:
             raise e
 
