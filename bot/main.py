@@ -55,25 +55,11 @@ def main():
     migrate_db()
 
     # ========== НАСТРОЙКА ПРОКСИ ==========
-    # Раскомментируй нужную строку и вставь свои данные
-    
-    # Для SOCKS5 прокси (например, Tor)
     # proxy_url = "socks5://127.0.0.1:9050"
-    
-    # Для HTTP/HTTPS прокси
-    # proxy_url = "http://user:pass@proxy_ip:port"
-    # proxy_url = "http://proxy_ip:port"
-    
-    # Или из переменных окружения
-    # proxy_url = os.getenv("PROXY_URL")
-
-    # Создаём приложение
-    app = Application.builder().token(BOT_TOKEN).build()
-    
-    # Применяем прокси (если указан)
     # if proxy_url:
     #     app.bot.request = app.bot.request.with_proxy(proxy_url)
-    #     print(f"✅ Прокси настроен: {proxy_url}")
+
+    app = Application.builder().token(BOT_TOKEN).build()
 
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
