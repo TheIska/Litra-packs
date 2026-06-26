@@ -1,6 +1,8 @@
 import logging
-import asyncio
+import os
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram import Update
+from telegram.ext import ContextTypes
 from .config import BOT_TOKEN
 from .database import init_db, migrate_db
 from .handlers.start import (
@@ -26,7 +28,12 @@ from .handlers.album import (
     show_album, 
     album_navigation, 
     show_card_by_number,
-    album_back
+    album_back,
+    sell_duplicates_menu,
+    sell_duplicates_card,
+    sell_duplicates_confirm,
+    sell_duplicates_all,
+    sell_duplicates_all_confirm,
 )
 from .handlers.duel import (
     duel_command,
@@ -51,7 +58,26 @@ def main():
     init_db()
     migrate_db()
 
+    # ========== НАСТРОЙКА ПРОКСИ ==========
+    # Раскомментируй нужную строку и вставь свои данные
+    
+    # Для SOCKS5 прокси (например, Tor)
+    # proxy_url = "socks5://127.0.0.1:9050"
+    
+    # Для HTTP/HTTPS прокси
+    # proxy_url = "http://user:pass@proxy_ip:port"
+    # proxy_url = "http://proxy_ip:port"
+    
+    # Или из переменных окружения
+    # proxy_url = os.getenv("PROXY_URL")
+
+    # Создаём приложение
     app = Application.builder().token(BOT_TOKEN).build()
+    
+    # Применяем прокси (если указан)
+    # if proxy_url:
+    #     app.bot.request = app.bot.request.with_proxy(proxy_url)
+    #     print(f"✅ Прокси настроен: {proxy_url}")
 
     # ========== КОМАНДЫ ==========
     app.add_handler(CommandHandler("start", start))
@@ -83,6 +109,13 @@ def main():
     app.add_handler(CallbackQueryHandler(album_back, pattern="^album_back$"))
     app.add_handler(CallbackQueryHandler(album_navigation, pattern="^album_"))
     app.add_handler(CallbackQueryHandler(show_album, pattern="^album$"))
+
+    # ========== ПРОДАЖА ДУБЛИКАТОВ ==========
+    app.add_handler(CallbackQueryHandler(sell_duplicates_menu, pattern="sell_duplicates_menu"))
+    app.add_handler(CallbackQueryHandler(sell_duplicates_card, pattern="sell_duplicates_card"))
+    app.add_handler(CallbackQueryHandler(sell_duplicates_confirm, pattern="sell_duplicates_confirm"))
+    app.add_handler(CallbackQueryHandler(sell_duplicates_all, pattern="sell_duplicates_all"))
+    app.add_handler(CallbackQueryHandler(sell_duplicates_all_confirm, pattern="sell_duplicates_all_confirm"))
 
     # ========== ДРУЗЬЯ ==========
     app.add_handler(CallbackQueryHandler(friends_menu, pattern="^friends_menu$"))
@@ -123,7 +156,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_admin))
 
     print("🤖 Бот запущен!")
-    asyncio.run(app.run_polling())
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
